@@ -11,7 +11,8 @@ function M=backprop(X,Y)
 	for ou=1:n %n is the maximum number of outer loop iterations
 % randomize the ordering of the vector in both X & Y
         RN=randperm(mx); X=X(:, RN); Y=Y(:, RN); % randomize patterns
-        for k = 1:p 
+         % run through all patterns now in random order
+        for k = 1:mx 
             % forward run
             x = X(:,k); y = Y(:,k); % x is 3x1 and y is 1x1
             y1 = tanh(W1*x); y1(3) = 1 ; y2 = tanh(W2*y1);     % calculate the outputs y1=2x1 -> 3x1 w bias, y = 1x1
