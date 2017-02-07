@@ -13,9 +13,9 @@ function M=backprop(X,Y)
         RN=randperm(mx); X=X(:, RN); Y=Y(:, RN); % randomize patterns
         for k = 1:p 
             % forward run
-            x = X(:,k); y = Y(:,k);
-            y1 = tanh(W1*x); y1(3) = 1 ; y2 = tanh(W2*y1);     % calculate the outputs 
-                           % add bias value
+            x = X(:,k); y = Y(:,k); % x is 3x1 and y is 1x1
+            y1 = tanh(W1*x); y1(3) = 1 ; y2 = tanh(W2*y1);     % calculate the outputs y1=2x1 -> 3x1 w bias, y = 1x1
+                           % add bias value y1 = 3 x 1
             % backprop
             e2 = (y - y2); delta2 = e2*(1 - y2^2);  % calculating e2 and Delta2 -> for tanhx: f' = 1 - f^2  
             delta1 = (1-y1^2)*delta2*W2(1:2,1);     % the backpropegation step  
