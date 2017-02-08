@@ -1,4 +1,4 @@
-function BPNeuralNetwork_final
+function BPNeuralNetwork
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 numNodes = [2, 2, 1];  % set the number of nodes and layers in the neural network
@@ -10,7 +10,7 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
 batchSize = 1;
 
-maxIterations = 1000;
+maxIterations = 5000;
 errorTolerance = 0.05;
 
 input = [-1, -1;
@@ -32,7 +32,7 @@ if total_steps == maxIterations * size(output,1)
     disp('Max iterations reached')
 else disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])  
 end
-
+plot(Erms_store);
 disp(['RMS error = ',num2str(RMSe)])
 end
 
@@ -95,11 +95,11 @@ for i = 1:maxIterations
             return
         end
     end
-%      if mod(k,m) == 0
-%         testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-%         RMSe = norm(trainOutput - testOutput)/sqrt(size(output,1));
-%         Erms_store = [Erms_store RMSe];
-%     end
+     if mod(k,m) == 0
+        testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+        RMSe = norm(trainOutput - testOutput)/sqrt(size(trainOutput,1));
+        Erms_store = [Erms_store RMSe];
+    end
 end
 
 end
