@@ -4,14 +4,14 @@ function BPNeuralNetwork
 numNodes = [3, 3, 1];  % set the number of nodes and layers in the neural network
 weightMatrices = createWeightValues(numNodes);  % create the weight matrices for each hidden layer and output layer
 
-learningRate = 0.001;
+learningRate = 0.01;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
 batchSize = 1;
 
-maxIterations = 10000;
-errorTolerance = 0.05;
+maxIterations = 1000;
+errorTolerance = 0.15;
 
 input = [-1, -1, 1;
          -1,  1, 1;
@@ -23,18 +23,19 @@ output = [-1;
            1; 
           -1];
 % train the XOR
-weightMatrices = train(input, output, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+[weightMatrices,total_steps] = train(input, output, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
 
 testOutput = test(input, tanhSlope, numNodes, weightMatrices);
-
+RMSe = norm(output - testOutput)/sqrt(size(output,1));
 disp(testOutput)
-
+disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
+disp(['RMS error = ',num2str(RMSe)])
 end
 
 
-function weightMatrices = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
+function [weightMatrices,total_steps] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
 % The actual neural network in this function
-
+total_steps = maxIterations * size(trainInput,1); % default total steps until convergence - changed later after test condition
 
 layerOutputs = cell(1,length(numNodes));
 
@@ -46,7 +47,7 @@ for i = 1:maxIterations
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
     randomizedOutput = trainOutput(randomIndices,:);
-    for j = 1:length(randomizedInput)
+    for j = 1:size(trainInput,1)
         pattern = randomizedInput(j,:);
         desiredOutput = randomizedOutput(j,:);
         
@@ -80,9 +81,11 @@ for i = 1:maxIterations
         weightMatrices = updateWeights(numNodes, weightMatrices, weightDeltas);
         
         testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+        desiredOutput = trainOutput;
         RMSE = computeRMSE(desiredOutput,testOutput);
         if RMSE < errorTolerance
-            disp('DONE!')
+            total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
+            
             return
         end
     end
@@ -192,4 +195,12 @@ f = (exp(a .* x) - exp(-a .* x)) ./ (exp(a .* x) + exp(-a .* x));
 
 end
 
+function d = documnt(Initial_weights,tanh_slope,learning_parameter,stopping_critereon)
+f = fopen(BP_output.txt,w);
+
+t1 = table(tanh_slope,learning_parameter,stopping_critereon);
+t2 = table()
+fprintf(Initial_weights)
+formatspec = '';
+end
 
