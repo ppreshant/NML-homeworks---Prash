@@ -11,7 +11,7 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 batchSize = 1;
 
 maxIterations = 1000;
-errorTolerance = 0.15;
+errorTolerance = 0.05;
 
 input = [-1, -1, 1;
          -1,  1, 1;
@@ -28,12 +28,16 @@ output = [-1;
 testOutput = test(input, tanhSlope, numNodes, weightMatrices);
 RMSe = norm(output - testOutput)/sqrt(size(output,1));
 disp(testOutput)
-disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
+if total_steps == maxIterations * size(output,1)
+    disp('Max iterations reached')
+else disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])  
+end
+
 disp(['RMS error = ',num2str(RMSe)])
 end
 
 
-function [weightMatrices,total_steps] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
+function [weightMatrices, total_steps, Erms_store] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
 % The actual neural network in this function
 total_steps = maxIterations * size(trainInput,1); % default total steps until convergence - changed later after test condition
 
@@ -42,6 +46,8 @@ layerOutputs = cell(1,length(numNodes));
 nodeDeltas = createNodeValues(numNodes);
 nodeErrorGradients = createNodeValues(numNodes);
 weightDeltas = createWeightValues(numNodes);
+
+Erms_store = []; % store the RMS error every m iterations
 
 for i = 1:maxIterations
     randomIndices = randperm(size(trainInput,1));
@@ -89,7 +95,11 @@ for i = 1:maxIterations
             return
         end
     end
-end
+    if mod(k,m) = 0
+        testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+        RMSe = norm(output - testOutput)/sqrt(size(output,1));
+        Erms_store = [Erms_store RMSe]
+    end
 
 end
 
