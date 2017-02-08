@@ -1,4 +1,4 @@
-function BPNeuralNetwork_final
+function BPNeuralNetwork_rangan
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 numNodes = [2, 2, 1];  % set the number of nodes and layers in the neural network
@@ -11,43 +11,34 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 batchSize = 1;
 
 maxIterations = 1000;
-errorTolerance = 0.05;
+errorTolerance = 0.15;
 
 input = [-1, -1;
          -1,  1;
           1, -1;
           1,  1];
-      
+
 output = [-1;
            1; 
            1; 
           -1];
-% train the XOR
-[weightMatrices,total_steps, Erms_store] = train(input, output, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
-% Recall step
+
+weightMatrices = train(input, output, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+
 testOutput = test(input, tanhSlope, numNodes, weightMatrices);
-RMSe = norm(output - testOutput)/sqrt(size(output,1)); % calculates the RMS error for all patterns
+
 disp(testOutput)
-if total_steps == maxIterations * size(output,1)
-    disp('Max iterations reached')
-else disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])  
-end
 
-disp(['RMS error = ',num2str(RMSe)])
 end
 
 
-function [weightMatrices, total_steps, Erms_store] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
-% The actual neural network in this function
+function weightMatrices = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
+
 layerOutputs = cell(1,length(numNodes));
-
-total_steps = maxIterations * size(trainInput,1); % default total steps until convergence - changed later after test condition
 
 nodeDeltas = createNodeValues(numNodes);
 nodeErrorGradients = createNodeValues(numNodes);
 weightDeltas = createWeightValues(numNodes);
-
-Erms_store = []; % stores the RMS error every m iterations
 
 for i = 1:maxIterations
     randomIndices = randperm(size(trainInput,1));
@@ -78,8 +69,8 @@ for i = 1:maxIterations
                         nodeErrorGradients{m-1}(n) = -1 .* nodeDeltas{m-1}(n) .* previousLayerOutput(p);
                         weightDeltas{m-1}(n,p) = -learningRate .* nodeErrorGradients{m-1}(n);
                     else
+                        nodeDeltas{m-1}(n) = computeHiddenNodeDelta(tanhSlope,m-1,n,layerOutputs,nodeDeltas,weightMatrices);
                         nodeErrorGradients{m-1}(n) = computeHiddenNodeErrorGradient(m-1, n, nodeDeltas, weightMatrices);
-                        nodeDeltas{m-1}(n) = computeHiddenNodeDelta(nodeErrorGradients{m-1}(n), tanhSlope, m-1, n, layerOutputs, weightMatrices);
                         weightDeltas{m-1}(n,p) = learningRate .* nodeDeltas{m-1}(n) .* previousLayerOutput(p);
                     end
                 end
@@ -90,16 +81,10 @@ for i = 1:maxIterations
         testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
         RMSE = computeRMSE(desiredOutput,testOutput);
         if RMSE < errorTolerance
-            total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
-            
+            disp('DONE!')
             return
         end
     end
-%      if mod(k,m) == 0
-%         testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-%         RMSe = norm(trainOutput - testOutput)/sqrt(size(output,1));
-%         Erms_store = [Erms_store RMSe];
-%     end
 end
 
 end
@@ -134,24 +119,29 @@ end
 end
 
 
-function hiddenNodeDelta = computeHiddenNodeDelta(hiddenNodeErrorGradient, tanhSlope, layerIndex, nodeIndex, layerOutputs, weightMatrices)
+function hiddenNodeDelta = computeHiddenNodeDelta(tanhSlope, layerIndex, nodeIndex, layerOutputs, nodeDeltas, weightMatrices)
 
 previousLayerOutput = layerOutputs{layerIndex};
 currentLayerWeightVector = weightMatrices{layerIndex}(nodeIndex,:);
 derivative = hyperbolicTangentDerivative(tanhSlope, currentLayerWeightVector * previousLayerOutput');
 
-hiddenNodeDelta = -1 .* derivative .* hiddenNodeErrorGradient;
+nextLayerWeightVector = weightMatrices{layerIndex+1}(:,nodeIndex);
+deltaVector = nodeDeltas{layerIndex+1};
+summation = deltaVector * nextLayerWeightVector;
+
+hiddenNodeDelta = derivative .* summation;
+
 
 end
 
 
 function hiddenNodeErrorGradient = computeHiddenNodeErrorGradient(layerIndex, nodeIndex, nodeDeltas, weightMatrices)
-% unnecessary function??
+
 nextLayerWeightVector = weightMatrices{layerIndex+1}(:,nodeIndex);
 deltaVector = nodeDeltas{layerIndex+1};
 summation = deltaVector * nextLayerWeightVector;
 
-hiddenNodeErrorGradient = -summation; % this formula looks wrong to me - prashant
+hiddenNodeErrorGradient = -summation;
 
 end
 
@@ -203,3 +193,5 @@ function f = hyperbolicTangentFunction(a,x)
 f = (exp(a .* x) - exp(-a .* x)) ./ (exp(a .* x) + exp(-a .* x));
 
 end
+
+
