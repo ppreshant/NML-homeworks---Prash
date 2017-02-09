@@ -10,7 +10,7 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
 batchSize = 1;
 
-maxIterations = 5000;
+maxIterations = 10000;
 errorTolerance = 0.05;
 
 input = [-1, -1;
@@ -30,10 +30,15 @@ RMSe = norm(output - testOutput)/sqrt(size(output,1)); % calculates the RMS erro
 disp(testOutput)
 if total_steps == maxIterations * size(output,1)
     disp('Max iterations reached')
-else disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])  
+else
+    disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
-plot(Erms_store);
+
 disp(['RMS error = ',num2str(RMSe)])
+
+figure(1); plot(Erms_store(2,:),Erms_store(1,:)); title('RMS error vs training steps'); 
+xlabel('Numeber of training steps'); ylabel('RMS of errors of all patterns')
+
 end
 
 
@@ -47,7 +52,12 @@ nodeDeltas = createNodeValues(numNodes);
 nodeErrorGradients = createNodeValues(numNodes);
 weightDeltas = createWeightValues(numNodes);
 
-Erms_store = []; % stores the RMS error every m iterations
+eval_interval = total_steps/20;
+Erms_store = zeros(2,20); % stores the RMS error every m iterations
+% initial error
+testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+RMSe = norm(trainOutput - testOutput)/sqrt(size(trainOutput,1));
+dum = 1; Erms_store(1,dum) = RMSe; Erms_store(2,dum) = 0; dum = dum + 1; % store errors and learning steps
 
 for i = 1:maxIterations
     randomIndices = randperm(size(trainInput,1));
@@ -55,7 +65,7 @@ for i = 1:maxIterations
     randomizedOutput = trainOutput(randomIndices,:);
     for j = 1:length(randomizedInput)
         pattern = randomizedInput(j,:);
-        desiredOutput = randomizedOutput(j,:);
+        desiredOutput = randomizedOutput(j,:); % this is randomized don't use for testing
         
         % forward propagation
         layerOutputs{1} = pattern;
@@ -87,18 +97,18 @@ for i = 1:maxIterations
         end
         weightMatrices = updateWeights(numNodes, weightMatrices, weightDeltas);
         
-        testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-        RMSE = computeRMSE(desiredOutput,testOutput);
-        if RMSE < errorTolerance
-            total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
-            
-            return
-        end
+
     end
-     if mod(k,m) == 0
-        testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-        RMSe = norm(trainOutput - testOutput)/sqrt(size(trainOutput,1));
-        Erms_store = [Erms_store RMSe];
+    
+    testOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+    RMSE = computeRMSE(trainOutput,testOutput);
+    if RMSE < errorTolerance
+        total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
+        Erms_store = Erms_store(:,Erms_store(1,:) ~= 0); % clip the Error storage matrix when terminating
+        return
+    end
+    if mod(i*j,eval_interval) == 0
+        Erms_store(1,dum) = RMSE; Erms_store(2,dum) = i*j; dum = dum + 1; % store errors and learning steps
     end
 end
 
