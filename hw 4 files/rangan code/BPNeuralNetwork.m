@@ -1,8 +1,9 @@
 function BPNeuralNetwork
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
-numNodes = [2, 2, 1];  % set the number of nodes and layers in the neural network
+numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightValues(numNodes);  % create the weight matrices for each hidden layer and output layer
+weight_init = weightMatrices; % storing the initial weights
 
 learningRate = 0.01;
 
@@ -10,25 +11,33 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
 batchSize = 1;
 
-maxIterations = 10000;
+maxIterations = 1000;
 errorTolerance = 0.05;
 
-input = [-1, -1;
-         -1,  1;
-          1, -1;
-          1,  1];
-      
-output = [-1;
-           1; 
-           1; 
-          -1];
+% trainInput = [-1, -1;
+%          -1,  1;
+%           1, -1;
+%           1,  1];
+%       
+% trainOutput = [-1;
+%            1; 
+%            1; 
+%           -1];
+
+trainInput = linspace(0.1,1.0,200)';
+
+trainOutput = multiplicativeInverseFunction(linspace(0.1,1.0,200)');
+trainOutput = trainOutput ./ max(trainOutput);
+
+testInput = linspace(0.1,1.0,100)'; % beware - testOutput has been used in other functions here
+
 % train the XOR
-[weightMatrices,total_steps, Erms_store] = train(input, output, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+[weightMatrices,total_steps, Erms_store] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
 % Recall step
-testOutput = test(input, tanhSlope, numNodes, weightMatrices);
-RMSe = norm(output - testOutput)/sqrt(size(output,1)); % calculates the RMS error for all patterns
-disp(testOutput)
-if total_steps == maxIterations * size(output,1)
+getOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+RMSe = norm(trainOutput - getOutput)/sqrt(size(trainOutput,1)); % calculates the RMS error for all patterns
+disp(getOutput)
+if total_steps == maxIterations * size(trainOutput,1)
     disp('Max iterations reached')
 else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
@@ -180,7 +189,7 @@ weightValues = cell(1, numMatrices);
 
 for i = 1:numMatrices
     weightValues{i} = rand(numNodes(i+1), numNodes(i));
-    weightValues{i}(:,end+1) = zeros(1,length(weightValues{i}(:,end)));
+    weightValues{i}(:,end+1) = rand(1,length(weightValues{i}(:,end)));
     if i ~= numMatrices
         weightValues{i}(end+1,:) = zeros(1,length(weightValues{i}(end,:)));
     end
@@ -211,5 +220,11 @@ end
 function f = hyperbolicTangentFunction(a,x)
 
 f = (exp(a .* x) - exp(-a .* x)) ./ (exp(a .* x) + exp(-a .* x));
+
+end
+
+function f = multiplicativeInverseFunction(x)
+
+f = 1 ./ x;
 
 end
