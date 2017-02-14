@@ -2,7 +2,7 @@ function ProblemII
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 
-batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
+batchSize = 10;  % set the size of the batch, i.e. number of patterns per batch
 
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
@@ -33,7 +33,7 @@ scaledTestOutput = testOutput ./ maxTestScale;
 weightMatrices = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
 
 % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
-actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
+actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale; % re-scaled
 disp(actualTrainOutput)
 disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
@@ -62,6 +62,13 @@ plot(trainInput,trainOutput);
 xlabel('x')
 ylabel('f(x) = 1/x')
 title('Comparison of training accuracy wrt desired output')
+
+figure;
+plot(trainInput,trainOutput - actualTrainOutput);
+
+xlabel('x')
+ylabel('D - actual Y')
+title('Comparison of training accuracy wrt desired output')
 end
 
 
@@ -80,69 +87,61 @@ for i = 1:maxIterations % big loop
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
     randomizedOutput = trainOutput(randomIndices,:);
-    for j = 1:numBatches % numBatches = number of bathes the patterns are partitioned into
-                
-        if j * batchSize > length(randomizedInput)
-            batchInput = randomizedInput((j-1) * batchSize + 1:end,:);
-            batchOutput = randomizedOutput((j-1) * batchSize + 1:end,:);
-        else
-            batchInput = randomizedInput((j-1) * batchSize + 1:j * batchSize,:);
-            batchOutput = randomizedOutput((j-1) * batchSize + 1:j * batchSize,:);
+
+    batchInput = randomizedInput(batchSize:end,:);
+    batchOutput = randomizedOutput(batchSize:end,:);
+    weightDeltas = createWeightDeltas(numNodes); %initializing deltaweights with 0s
+    
+    for k = 1:batchSize % loop over all patterns in the batch
+        
+        nodeErrorGradients = createNodeValues(numNodes);
+        layerOutputs = cell(1,length(numNodes));
+        nodeDeltas = createNodeValues(numNodes);
+        
+        pattern = batchInput(k,:);
+        desiredOutput = batchOutput(k,:);  % this is randomized don't use for testing
+        
+        % forward propagation
+        layerOutputs{1} = pattern;
+        layerOutputs{1}(end+1) = 1;  % fixing bias = 1
+        
+        for l = 1:length(numNodes)-1
+            layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')';
+            if l ~= length(numNodes) - 1
+                layerOutputs{l+1}(end) = 1; % fixing bias nodes = 1 before calculating next layer's output
+            end
         end
         
-        weightDeltas = createWeightDeltas(numNodes); %initializing weights with 0s 
-        
-        for k = 1:size(batchInput,1) % loop over all patterns in the batch
+        % backward propagation
+        for m = length(numNodes):-1:2 % going over layers
             
-            nodeErrorGradients = createNodeValues(numNodes);
-            layerOutputs = cell(1,length(numNodes));
-            nodeDeltas = createNodeValues(numNodes);
+            currentLayerOutput = layerOutputs{m};
+            previousLayerOutput = layerOutputs{m-1};
             
-            pattern = batchInput(k,:);
-            desiredOutput = batchOutput(k,:);  % this is randomized don't use for testing
-            
-            % forward propagation
-            layerOutputs{1} = pattern;
-            layerOutputs{1}(end+1) = 1;  % fixing bias = 1
-            
-            for l = 1:length(numNodes)-1
-                layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')';
-                if l ~= length(numNodes) - 1
-                    layerOutputs{l+1}(end) = 1; % fixing bias nodes = 1 before calculating next layer's output
-                end
-            end
-            
-            % backward propagation
-            for m = length(numNodes):-1:2 % going over layers
+            % can we change into matrix multiplication - for n and for p  - too many loops over here
+            for n = 1:length(currentLayerOutput) % for each layer going over nodes
                 
-                currentLayerOutput = layerOutputs{m};
-                previousLayerOutput = layerOutputs{m-1};
-                
-                % can we change into matrix multiplication - for n and for p  - too many loops over here              
-                for n = 1:length(currentLayerOutput) % for each layer going over nodes
+                for p = 1:length(previousLayerOutput) % need summation over nodes of previous layer
                     
-                    for p = 1:length(previousLayerOutput) % need summation over nodes of previous layer
-                        
-                        if m == length(numNodes) % delta rule for last layer  % remove this if and generalize if possible
-                            nodeDeltas{m-1}(n) = (desiredOutput(n) - currentLayerOutput(n)) .* hyperbolicTangentDerivative(tanhSlope, weightMatrices{m-1}(n,:) * previousLayerOutput')';
-                            nodeErrorGradients{m-1}(n) = -1 .* nodeDeltas{m-1}(n) .* previousLayerOutput(p);
-                            weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (-learningRate .* nodeErrorGradients{m-1}(n));
-                        else
-                            if n ~= length(currentLayerOutput)
-                                nodeErrorGradients{m-1}(n) = computeHiddenNodeErrorGradient(m-1, n, nodeDeltas, weightMatrices);
-                                nodeDeltas{m-1}(n) = computeHiddenNodeDelta(nodeErrorGradients{m-1}(n), tanhSlope, m-1, n, layerOutputs, weightMatrices);
-                                weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (learningRate .* nodeDeltas{m-1}(n) .* previousLayerOutput(p)); % check if the formula is right
-                            end
+                    if m == length(numNodes) % delta rule for last layer  % remove this if and generalize if possible
+                        nodeDeltas{m-1}(n) = (desiredOutput(n) - currentLayerOutput(n)) .* hyperbolicTangentDerivative(tanhSlope, weightMatrices{m-1}(n,:) * previousLayerOutput')';
+                        nodeErrorGradients{m-1}(n) = -1 .* nodeDeltas{m-1}(n) .* previousLayerOutput(p);
+                        weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (-learningRate .* nodeErrorGradients{m-1}(n));
+                    else
+                        if n ~= length(currentLayerOutput)
+                            nodeErrorGradients{m-1}(n) = computeHiddenNodeErrorGradient(m-1, n, nodeDeltas, weightMatrices);
+                            nodeDeltas{m-1}(n) = computeHiddenNodeDelta(nodeErrorGradients{m-1}(n), tanhSlope, m-1, n, layerOutputs, weightMatrices);
+                            weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (learningRate .* nodeDeltas{m-1}(n) .* previousLayerOutput(p)); % check if the formula is right
                         end
                     end
                 end
             end
-        end        
-%         disp(weightMatrices{1})
-%         disp(weightMatrices{2})
-        weightMatrices = updateWeights(numNodes, weightMatrices, weightDeltas);
+        end
     end
-    
+    %         disp(weightMatrices{1})
+    %         disp(weightMatrices{2})
+    weightMatrices = updateWeights(numNodes, weightMatrices, weightDeltas);
+        
 end
 
 end
