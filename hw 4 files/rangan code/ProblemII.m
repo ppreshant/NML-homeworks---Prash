@@ -2,7 +2,7 @@ function ProblemII
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 
-batchSize = 10;  % set the size of the batch, i.e. number of patterns per batch
+batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
 
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
@@ -14,7 +14,7 @@ tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 maxIterations = 3000;
 errorTolerance = 0.08;
 
-N_training_pts = 50; % number of training patterns
+N_training_pts = 200; % number of training patterns
 
 trainInput = linspace(0.1,1.0,N_training_pts)';
 trainOutput = multiplicativeInverseFunction(trainInput);
@@ -77,12 +77,15 @@ function weightMatrices = train(trainInput, trainOutput, numNodes, weightMatrice
 
 % The actual neural network in this function
 
+%  For 3 layers (layer 1,2,3 - layer 1 is input)
+% inputs go 1,2,3
+% weights go 1,2  
+% delta go 1 to 2
+
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
     return
 end
-
-numBatches = ceil(length(trainInput) ./ batchSize);
 
 for i = 1:maxIterations % big loop
     randomIndices = randperm(size(trainInput,1));
@@ -95,7 +98,7 @@ for i = 1:maxIterations % big loop
     
     for k = 1:batchSize % loop over all patterns in the batch
         
-        nodeErrorGradients = createNodeValues(numNodes);
+%         nodeErrorGradients = createNodeValues(numNodes);
         layerOutputs = cell(1,length(numNodes));
         nodeDeltas = createNodeValues(numNodes);
         
@@ -113,36 +116,40 @@ for i = 1:maxIterations % big loop
         l = l + 1; layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')'; % for last layer since there is no bias
         
         % backward propagation
-        for m = length(numNodes):-1:2 % going over layers
-            
-            currentLayerOutput = layerOutputs{m};
+        m = length(numNodes);
+        currentLayerOutput = layerOutputs{m};
+        previousLayerOutput = layerOutputs{m-1};
+        
+        nodeDeltas{m-1} = diag(hyperbolicTangentDerivative(tanhSlope, weightMatrices{m-1} * previousLayerOutput')) * (desiredOutput - currentLayerOutput);
+        for m = length(numNodes)-1:-1:2 % going over layers
+                        
             previousLayerOutput = layerOutputs{m-1};
-            
-            % can we change into matrix multiplication - for n and for p  - too many loops over here
-            for n = 1:length(currentLayerOutput) % for each layer going over nodes
-                
-                for p = 1:length(previousLayerOutput) % need summation over nodes of previous layer
-                    
-                    if m == length(numNodes) % delta rule for last layer  % remove this if and generalize if possible
-                        nodeDeltas{m-1}(n) = (desiredOutput(n) - currentLayerOutput(n)) .* hyperbolicTangentDerivative(tanhSlope, weightMatrices{m-1}(n,:) * previousLayerOutput')';
-                        nodeErrorGradients{m-1}(n) = -1 .* nodeDeltas{m-1}(n) .* previousLayerOutput(p);
-                        weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (-learningRate .* nodeErrorGradients{m-1}(n));
-                    else
-                        if n ~= length(currentLayerOutput)
-                            nodeErrorGradients{m-1}(n) = computeHiddenNodeErrorGradient(m-1, n, nodeDeltas, weightMatrices);
-                            nodeDeltas{m-1}(n) = computeHiddenNodeDelta(nodeErrorGradients{m-1}(n), tanhSlope, m-1, n, layerOutputs, weightMatrices);
-                            weightDeltas{m-1}(n,p) = weightDeltas{m-1}(n,p) + (learningRate .* nodeDeltas{m-1}(n) .* previousLayerOutput(p)); % check if the formula is right
-                        end
-                    end
-                end
-            end
+
+            % vectorizing the delta updates
+            nodeDeltas{m-1} = computeTheNodeDeltas(nodeDeltas, tanhSlope, m-1, layerOutputs, weightMatrices);
+            weightDeltas{m-1} = weightDeltas{m-1} + (learningRate * nodeDeltas{m-1} * previousLayerOutput);
         end
     end
     %         disp(weightMatrices{1})
     %         disp(weightMatrices{2})
-    weightMatrices = updateWeights(numNodes, weightMatrices, weightDeltas);
+    weightMatrices = updateWeights(weightMatrices, weightDeltas);
         
 end
+
+end
+
+
+function hiddenNodeDeltas = computeTheNodeDeltas(nodeDeltas, tanhSlope, layerIndex,layerOutputs, weightMatrices)
+% enters into this function to calculate nodeDeltas recursively for each
+% layer in the loop
+previousLayerOutput = layerOutputs{layerIndex};
+currentLayerWeightVector = weightMatrices{layerIndex};
+nextLayerWeightVectorTranspose = weightMatrices{layerIndex+1}';
+nextLayerDeltaVector = nodeDeltas{layerIndex+1};
+
+derivative = hyperbolicTangentDerivative(tanhSlope, currentLayerWeightVector * previousLayerOutput');
+
+hiddenNodeDeltas = diag(derivative) * nextLayerWeightVectorTranspose * nextLayerDeltaVector;
 
 end
 
@@ -165,35 +172,13 @@ end
 end
 
 
-function updatedWeights = updateWeights(numNodes, weightMatrices, weightDeltas)
+function updatedWeights = updateWeights(weightMatrices, weightDeltas)
 
 updatedWeights = weightMatrices; % dummy initialization with same dimension as existing weights
 
 for i = 1:length(weightMatrices)
     updatedWeights{i} = weightMatrices{i} + weightDeltas{i};
 end
-
-end
-
-
-function hiddenNodeDelta = computeHiddenNodeDelta(hiddenNodeErrorGradient, tanhSlope, layerIndex, nodeIndex, layerOutputs, weightMatrices)
-
-previousLayerOutput = layerOutputs{layerIndex};
-currentLayerWeightVector = weightMatrices{layerIndex}(nodeIndex,:);
-derivative = hyperbolicTangentDerivative(tanhSlope, currentLayerWeightVector * previousLayerOutput');
-
-hiddenNodeDelta = -1 .* derivative .* hiddenNodeErrorGradient;
-
-end
-
-
-function hiddenNodeErrorGradient = computeHiddenNodeErrorGradient(layerIndex, nodeIndex, nodeDeltas, weightMatrices)
-
-nextLayerWeightVector = weightMatrices{layerIndex+1}(:,nodeIndex);
-deltaVector = nodeDeltas{layerIndex+1};
-summation = deltaVector * nextLayerWeightVector;
-
-hiddenNodeErrorGradient = -summation; % this formula looks wrong to me - prashant
 
 end
 
