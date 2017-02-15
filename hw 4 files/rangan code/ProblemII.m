@@ -55,6 +55,7 @@ figure
 hold on
 grid on
 
+subplot(2,1,1)
 plot(trainInput,actualTrainOutput);
 hold on;
 plot(trainInput,trainOutput);
@@ -63,12 +64,12 @@ xlabel('x')
 ylabel('f(x) = 1/x')
 title('Comparison of training accuracy wrt desired output')
 
-figure;
-plot(trainInput,trainOutput - actualTrainOutput);
+subplot(2,1,2)
+plot(trainInput,abs(trainOutput - actualTrainOutput));
 
 xlabel('x')
 ylabel('D - actual Y')
-title('Comparison of training accuracy wrt desired output')
+title('training output - desired output')
 end
 
 
@@ -88,8 +89,8 @@ for i = 1:maxIterations % big loop
     randomizedInput = trainInput(randomIndices,:);
     randomizedOutput = trainOutput(randomIndices,:);
 
-    batchInput = randomizedInput(batchSize:end,:);
-    batchOutput = randomizedOutput(batchSize:end,:);
+    batchInput = randomizedInput(1:batchSize,:);
+    batchOutput = randomizedOutput(1:batchSize,:);
     weightDeltas = createWeightDeltas(numNodes); %initializing deltaweights with 0s
     
     for k = 1:batchSize % loop over all patterns in the batch
@@ -105,12 +106,11 @@ for i = 1:maxIterations % big loop
         layerOutputs{1} = pattern;
         layerOutputs{1}(end+1) = 1;  % fixing bias = 1
         
-        for l = 1:length(numNodes)-1
+        for l = 1:length(numNodes)-2
             layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')';
-            if l ~= length(numNodes) - 1
-                layerOutputs{l+1}(end) = 1; % fixing bias nodes = 1 before calculating next layer's output
-            end
+            layerOutputs{l+1}(end) = 1; % fixing bias nodes = 1 before calculating next layer's output
         end
+        l = l + 1; layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')'; % for last layer since there is no bias
         
         % backward propagation
         for m = length(numNodes):-1:2 % going over layers
