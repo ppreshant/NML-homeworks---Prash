@@ -7,11 +7,11 @@ batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
 
-learningRate = 0.05;
+learningRate = 0.1/batchSize;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 3000;
+maxIterations = 10000;
 errorTolerance = 0.08;
 
 N_training_pts = 200; % number of training patterns
@@ -30,7 +30,7 @@ maxTestScale = max(testOutput);
 % scaledTestInput = testInput .* maxTestScale; % dont have to scale input
 scaledTestOutput = testOutput ./ maxTestScale;
 
-weightMatrices = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+[weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
 
 % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
 actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale; % re-scaled
@@ -68,12 +68,12 @@ subplot(2,1,2)
 plot(trainInput,abs(trainOutput - actualTrainOutput));
 
 xlabel('x')
-ylabel('D - actual Y')
-title('training output - desired output')
+ylabel('RMS error : calculated from scaled error of all train/test patterns')
+title('Learning History')
 end
 
 
-function weightMatrices = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
+function [weightMatrices, otherVariables] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
 
 % The actual neural network in this function
 
@@ -81,6 +81,8 @@ function weightMatrices = train(trainInput, trainOutput, numNodes, weightMatrice
 % inputs go 1,2,3
 % weights go 1,2  
 % delta go 1 to 2
+
+otherVariables = cell(3,1); % for storing total_steps, Erms_store_train, Erms_store_test
 
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
@@ -129,11 +131,26 @@ for i = 1:maxIterations % big loop
             nodeDeltas{m-1} = computeTheNodeDeltas(nodeDeltas, tanhSlope, m-1, layerOutputs, weightMatrices);
             weightDeltas{m-1} = weightDeltas{m-1} + (learningRate * nodeDeltas{m-1} * previousLayerOutput);
         end
-    end
+    end                             % end of the batch
     %         disp(weightMatrices{1})
     %         disp(weightMatrices{2})
     weightMatrices = updateWeights(weightMatrices, weightDeltas);
-        
+    
+%     frozenTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+%     frozenTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
+%     RMSE_train = computeRMSE(trainOutput,frozenTrainOutput);
+%     RMSE_test = computeRMSE(testOutput,frozenTestOutput);
+%     
+%     if RMSE_train < errorTolerance
+%         total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
+%         Erms_store_train = Erms_store_train(:,Erms_store_train(1,:) ~= 0); % clip the Error storage matrix when terminating
+%         return
+%     end
+%     
+%     if mod(i*j,eval_interval) == 0
+%         Erms_store_train(1,dum) = RMSE_train; Erms_store_train(2,dum) = i*j; dum = dum + 1; % store errors and learning steps
+%         Erms_store_test(1,dum) = RMSE_test; Erms_store_test(2,dum) = i*j; % store errors and learning steps
+%     end
 end
 
 end
