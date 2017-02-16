@@ -7,7 +7,7 @@ batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
 
-learningRate = 0.1/batchSize;
+learningRate = 1/batchSize;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
@@ -16,14 +16,14 @@ errorTolerance = 0.08;
 
 N_training_pts = 200; % number of training patterns
 
-trainInput = linspace(0.1,1.0,N_training_pts)';
+trainInput = linspace(0.11,1.0,N_training_pts)';
 trainOutput = multiplicativeInverseFunction(trainInput);
 
 maxTrainScale = max(trainOutput);
 % scaledTrainInput = trainInput .* maxTrainScale;
 scaledTrainOutput = trainOutput ./ maxTrainScale;
 
-testInput = linspace(0.1,1.0,N_training_pts/2)';
+testInput = rand(N_training_pts/2,1) * 0.9 + 0.1;
 testOutput = multiplicativeInverseFunction(testInput);
 
 maxTestScale = max(testOutput);
@@ -34,7 +34,8 @@ scaledTestOutput = testOutput ./ maxTestScale;
 
 % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
 actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale; % re-scaled
-disp(actualTrainOutput)
+% actualTrainOutput = sort(actualTrainOutput,'descend');
+disp(sort(actualTrainOutput,'descend'))
 disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
 % plot for training vs testing
@@ -55,21 +56,19 @@ figure
 hold on
 grid on
 
-subplot(2,1,1)
-plot(trainInput,actualTrainOutput);
+plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
 hold on;
 plot(trainInput,trainOutput);
 
 xlabel('x')
 ylabel('f(x) = 1/x')
 title('Comparison of training accuracy wrt desired output')
-
-subplot(2,1,2)
-plot(trainInput,abs(trainOutput - actualTrainOutput));
-
-xlabel('x')
-ylabel('RMS error : calculated from scaled error of all train/test patterns')
-title('Learning History')
+legend('Learnt Function','Actual Function')
+% plot(trainInput,abs(trainOutput - actualTrainOutput));
+% 
+% xlabel('x')
+% ylabel('RMS error : calculated from scaled error of all train/test patterns')
+% title('Learning History')
 end
 
 
