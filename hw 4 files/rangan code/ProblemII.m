@@ -5,25 +5,23 @@ function ProblemII
 batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
 eval_points = 100; % number of points in the learning history or error vs time graph
 
-clear;
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
-weightMatrices = createWeightMatrices(numNodes,[.2,.1]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
+weightMatrices = createWeightMatrices(numNodes,[1,0]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
 
 learningRate = 1/batchSize;
-alpha = 0.5;
+alpha = .5; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 10000;
-errorTolerance = 0.08;
+maxIterations = 12000;  % number of times each batch is processed ; can terminate before if converged
+errorTolerance = 0.02;  % unscaled error tolerance 
 
-N_training_pts = 200; % number of training patterns
+N_training_pts = 200;  % number of training patterns selected between 0.1 and 1
 
 trainInput = linspace(0.1,1.0,N_training_pts)';
 trainOutput = multiplicativeInverseFunction(trainInput);
 
 maxTrainScale = max(trainOutput);
-% scaledTrainInput = trainInput .* maxTrainScale;
 scaledTrainOutput = trainOutput ./ maxTrainScale;
 
 testInput = rand(N_training_pts/2,1) * 0.9 + 0.1;
@@ -46,27 +44,14 @@ Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:)
 Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
 
 if total_steps == maxIterations * batchSize
-    disp('Max iterations reached')
+    disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
 else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
 
 disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
-% plot for training vs testing
-% figure
-% hold on
-% grid on
-% 
-% plot(testInput,actualTestOutput);
-% hold on;
-% plot(testInput,testOutput);
-% 
-% xlabel('x')
-% ylabel('f(x) = 1/x')
-% title('Comparison of training and testing accuracies')
-
-% plot for testing accuracy
+% plot for Training accuracy
 figure;
 % subplot(2,1,1)
 hold on
@@ -83,8 +68,8 @@ legend('Learnt Function','Actual Function')
 
 figure; plot(Erms_train(2,:),Erms_train(1,:)); hold on;  plot(Erms_test(2,:),Erms_test(1,:));
 
-xlabel('Training steps')
-ylabel('RMS error : Of scaled train/test patterns')
+xlabel('Learning Steps')
+ylabel('RMS error : All Unscaled train/test patterns')
 title('Learning History')
 legend('Training Errors','Testing Errors')
 end
@@ -92,7 +77,7 @@ end
 
 function [weightMatrices, otherVariables] = train(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points)
 
-% The actual neural network in this function
+% The actual Neural Network in this function
 
 %  For 3 layers (layer 1,2,3 - layer 1 is input)
 % inputs go 1,2,3
@@ -174,14 +159,15 @@ for i = 1:maxIterations % big loop
         RMSE_test = computeRMSE(testOutput,frozenTestOutput);
         Erms_train(1,dum) = RMSE_train; Erms_train(2,dum) = i*k;  % store errors and learning steps
         Erms_test(1,dum) = RMSE_test; Erms_test(2,dum) = i*k; % store errors and learning steps
-    end
         
-%     if RMSE_train < errorTolerance
-%         total_steps = (i-1)* size(trainInput,1) + k; % steps taken to complete the training
-%         Erms_train = Erms_train(:,Erms_train(1,:) ~= 0); Erms_test = Erms_test(:,Erms_test(1,:) ~= 0); % clip the Error storage matrix when terminating
-%         return
-%     end
-%     
+        if RMSE_train < errorTolerance
+            total_steps = (i-1)* size(trainInput,1) + k; % steps taken to complete the training
+            Erms_train = Erms_train(:,Erms_train(1,:) ~= 0); Erms_test = Erms_test(:,Erms_test(1,:) ~= 0); % clip the Error storage matrix when terminating
+            otherVariables{1} = total_steps; otherVariables{2} = Erms_train; otherVariables{3} = Erms_test; % giving output variables
+            return
+        end
+    end
+            
 end
 
 otherVariables{1} = total_steps;
@@ -205,7 +191,7 @@ end
 
 
 function testOutput = test(testInput, tanhSlope, numNodes, weightMatrices)
-
+% recall function
 testOutput = zeros(length(testInput),1);
 
 for i = 1:length(testInput)
@@ -223,7 +209,7 @@ end
 
 
 function updatedWeights = updateWeights(weightMatrices, weightDeltas, alpha)
-
+% updates weights using deltaW input
 updatedWeights = weightMatrices; % dummy initialization with same dimension as existing weights
 
 for i = 1:length(weightMatrices)
@@ -241,7 +227,8 @@ end
 
 
 function weightMatrices = createWeightMatrices(numNodes, weightScale)
-
+% create random entries in the weight matrix: weight scale decides range of
+% weights
 numMatrices = length(numNodes) - 1;
 weightMatrices = cell(1, numMatrices);
 
@@ -256,7 +243,7 @@ end
 
 
 function weightDeltas = createWeightDeltas(numNodes)
-
+% creating dummy zero vectors for weight deltas
 numMatrices = length(numNodes) - 1;
 weightDeltas = cell(1, numMatrices);
 
@@ -271,14 +258,13 @@ end
 
 
 function nodeValues = createNodeValues(numNodes)
-
+% creating dummy zero values for nodeDeltas
 numLayers = length(numNodes);
 nodeValues = cell(1, numLayers - 1);
 
 for j = 2:numLayers
     nodeValues{j-1} = zeros(1,numNodes(j));
 end
-
 
 end
 
@@ -302,5 +288,3 @@ function f = multiplicativeInverseFunction(x)
 f = 1 ./ x;
 
 end
-
-
