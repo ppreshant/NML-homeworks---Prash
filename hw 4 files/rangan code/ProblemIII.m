@@ -2,11 +2,17 @@ function ProblemIII
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 %
 
-batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
+batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
 eval_points = 100; % number of points in the learning history or error vs time graph
 
 numHiddenNodes = [5,10,15,20];
-RMSEforDifferentParameter = zeros(1,length(numHiddenNodes));
+RMSEforDifferentParameter = zeros(2,length(numHiddenNodes));
+
+   % plots of desired outputs with axes labels, titles and legends
+    % plot for Training accuracy
+figure(1); figure(2); figure(3); figure(4);    
+set(figure(1), 'Visible', 'off'); set(figure(2), 'Visible', 'off'); set(figure(3), 'Visible', 'off'); set(figure(4), 'Visible', 'off'); 
+
 for i = 1:length(numHiddenNodes)
     numNodes = [1, numHiddenNodes(i), 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
     weightMatrices = createWeightMatrices(numNodes,[1,0]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
@@ -16,7 +22,7 @@ for i = 1:length(numHiddenNodes)
     
     tanhSlope = 1;  % set the slope of the hyperbolic tangent function
     
-    maxIterations = 1000;  % number of times each batch is processed ; can terminate before if converged
+    maxIterations = 30000;  % number of times each batch is processed ; can terminate before if converged
     errorTolerance = 0.00;  % scaled error tolerance (for inputs between [.1 - 1])
     
     N_training_pts = 200;  % number of training patterns selected between 0.1 and 1
@@ -36,7 +42,7 @@ for i = 1:length(numHiddenNodes)
     
     [weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
     
-    % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
+    actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
     actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
     % actualTrainOutput = sort(actualTrainOutput,'descend');
     % disp(sort(actualTrainOutput,'descend'))
@@ -52,63 +58,57 @@ for i = 1:length(numHiddenNodes)
 %     end
 %     
 %     disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
-    RMSEforDifferentParameter = computeRMSE(trainOutput,actualTrainOutput);
+    RMSEforDifferentParameter(1,i) = computeRMSE(trainOutput,actualTrainOutput);  % store the final RMSD values for TRAINING data
+    RMSEforDifferentParameter(2,i) = computeRMSE(testOutput,actualTestOutput);  % store the final RMSD values for TESTING data
     
     % plot for Training accuracy
-    figure(1);
-    
-    plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
-    hold on;
-    plot(trainInput,trainOutput);
-    
-    grid on
-    xlabel('x')
-    ylabel('f(x) = 1/x')
-    title(['Comparison of actual training curve wrt desired output',num2str(numHiddenNodes(i)),' Hidden Nodes'])
-    legend('Learnt Function','Actual Function')
+    set(groot,'CurrentFigure',1); plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--'); hold on;
     
     % plot for Testing accuracy
-    figure(2);
+    set(groot,'CurrentFigure',2); plot(sort(testInput,'descend'),sort(actualTestOutput),'--'); hold on;
+ 
+    % Learning history for Training
+    set(groot,'CurrentFigure',3); plot(Erms_train(2,:),Erms_train(1,:)); hold on; 
     
-    plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-    hold on;
-    plot(testInput,testOutput);
-    
-    grid on
-    xlabel('x')
-    ylabel('f(x) = 1/x')
-    title(['Comparison of actual testing accuracy wrt desired output',num2str(numHiddenNodes(i)),' Hidden Nodes'])
-    legend('Learnt Function','Actual Function')
-    
-    % plot for Training/Testing accuracy
-    figure(3);
-    
-    plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
-    hold on
-    plot(trainInput,trainOutput);
-    plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-    plot(testInput,testOutput);
-    
-    grid on
-    xlabel('x')
-    ylabel('f(x) = 1/x')
-    title(['Comparison of actual training and testing accuracy wrt desired output',num2str(numHiddenNodes(i)),' Hidden Nodes'])
-    legend('Training Learnt Function','Training Actual Function','Testing Learnt Function','Testing Actual Function')
-    
-    xlabel('x')
-    ylabel('f(x) = 1/x')
-    title(['Comparison of training accuracy wrt desired output for ',num2str(numHiddenNodes(i)),' Hidden Nodes'])
-    legend('Learnt Function','Actual Function')
-    
-    % Learning history
-    figure; plot(Erms_train(2,:),Erms_train(1,:)); hold on;  plot(Erms_test(2,:),Erms_test(1,:));
-    
-    xlabel('Learning Steps')
-    ylabel('RMS error : All Unscaled train/test patterns')
-    title(['Learning History for ',num2str(numHiddenNodes(i)),' Hidden Nodes'])
-    legend('Training Errors','Testing Errors')
-end
+    % Learning history for Testing data
+    set(groot,'CurrentFigure',4); plot(Erms_test(2,:),Erms_test(1,:)); hold on;
 
+end
+ 
+figure(1); plot(trainInput,trainOutput);
+
+grid on
+xlabel('x')
+ylabel('f(x) = 1/x')
+title('Training curves for different number of Hidden nodes')
+legend([num2str(numHiddenNodes(1)),' hidden nodes'], [num2str(numHiddenNodes(2)),' hidden nodes'], [num2str(numHiddenNodes(3)),' hidden nodes'], [num2str(numHiddenNodes(4)),' hidden nodes'], 'Desired Curve');
+
+% plot for Testing accuracy
+figure(2);  plot(sort(testInput,'descend'),sort(testOutput)); hold on;
+
+grid on
+xlabel('x')
+ylabel('f(x) = 1/x')
+title('Testing curves for different number of Hidden nodes')
+legend([num2str(numHiddenNodes(1)),' hidden nodes'], [num2str(numHiddenNodes(2)),' hidden nodes'], [num2str(numHiddenNodes(3)),' hidden nodes'], [num2str(numHiddenNodes(4)),' hidden nodes'], 'Desired Curve');
+
+% Learning history for Training
+figure(3);
+
+xlabel('Learning Steps')
+ylabel('RMS error : All Unscaled train/test patterns')
+title('Learning History for Training data')
+legend([num2str(numHiddenNodes(1)),' hidden nodes'], [num2str(numHiddenNodes(2)),' hidden nodes'], [num2str(numHiddenNodes(3)),' hidden nodes'], [num2str(numHiddenNodes(4)),' hidden nodes']);
+
+% Learning history for Testing
+figure(4);
+
+xlabel('Learning Steps')
+ylabel('RMS error : All Unscaled train/test patterns')
+title('Learning History for Testing data')
+legend([num2str(numHiddenNodes(1)),' hidden nodes'], [num2str(numHiddenNodes(2)),' hidden nodes'], [num2str(numHiddenNodes(3)),' hidden nodes'], [num2str(numHiddenNodes(4)),' hidden nodes'])
+RMSEforDifferentParameter(3,:) = numHiddenNodes;
+RMSEforDifferentParameter'
 end
 
 
