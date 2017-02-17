@@ -2,16 +2,17 @@ function ProblemII
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 
-batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
+batchSize = 100;  % set the size of the batch, i.e. number of patterns per batch
 
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
 
 learningRate = 1/batchSize;
+alpha = 0.5;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 3000;
+maxIterations = 20000;
 errorTolerance = 0.08;
 
 N_training_pts = 200; % number of training patterns
@@ -30,7 +31,7 @@ maxTestScale = max(testOutput);
 % scaledTestInput = testInput .* maxTestScale; % dont have to scale input
 scaledTestOutput = testOutput ./ maxTestScale;
 
-[weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+[weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha);
 
 % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
 actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale; % re-scaled
@@ -72,7 +73,7 @@ legend('Learnt Function','Actual Function')
 end
 
 
-function [weightMatrices, otherVariables] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance)
+function [weightMatrices, otherVariables] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha)
 
 % The actual neural network in this function
 
@@ -87,6 +88,8 @@ if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
     return
 end
+
+oldWeightDeltas = createWeightDeltas(numNodes);
 
 for i = 1:maxIterations % big loop
     randomIndices = randperm(size(trainInput,1));
@@ -133,8 +136,9 @@ for i = 1:maxIterations % big loop
     end                             % end of the batch
     %         disp(weightMatrices{1})
     %         disp(weightMatrices{2})
-    weightMatrices = updateWeights(weightMatrices, weightDeltas);
-    
+    weightDeltas = updateWeights(weightDeltas, oldWeightDeltas, alpha);
+    weightMatrices = updateWeights(weightMatrices, weightDeltas, 1);
+    oldWeightDeltas = weightDeltas;
 %     frozenTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
 %     frozenTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
 %     RMSE_train = computeRMSE(trainOutput,frozenTrainOutput);
@@ -152,9 +156,6 @@ for i = 1:maxIterations % big loop
 %     end
 end
 
-otherVariables{1} = total_steps;
-otherVariables{2} = Erms_training;
-otherVariables{3} = Erms_testing;
 end
 
 
@@ -191,12 +192,12 @@ end
 end
 
 
-function updatedWeights = updateWeights(weightMatrices, weightDeltas)
+function updatedWeights = updateWeights(weightMatrices, weightDeltas, alpha)
 
 updatedWeights = weightMatrices; % dummy initialization with same dimension as existing weights
 
 for i = 1:length(weightMatrices)
-    updatedWeights{i} = weightMatrices{i} + weightDeltas{i};
+    updatedWeights{i} = weightMatrices{i} + alpha .* weightDeltas{i};
 end
 
 end
