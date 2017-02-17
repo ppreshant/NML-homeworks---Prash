@@ -2,17 +2,19 @@ function ProblemII
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
 % 
 
-batchSize = 100;  % set the size of the batch, i.e. number of patterns per batch
+batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
+eval_points = 100; % number of points in the learning history or error vs time graph
 
+clear;
 numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
-weightMatrices = createWeightMatrices(numNodes);  % create the weight matrices for each hidden layer and output layer
+weightMatrices = createWeightMatrices(numNodes,[.2,.1]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
 
 learningRate = 1/batchSize;
 alpha = 0.5;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 20000;
+maxIterations = 10000;
 errorTolerance = 0.08;
 
 N_training_pts = 200; % number of training patterns
@@ -31,12 +33,24 @@ maxTestScale = max(testOutput);
 % scaledTestInput = testInput .* maxTestScale; % dont have to scale input
 scaledTestOutput = testOutput ./ maxTestScale;
 
-[weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha);
+[weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
 
 % actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
-actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale; % re-scaled
+actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
 % actualTrainOutput = sort(actualTrainOutput,'descend');
-disp(sort(actualTrainOutput,'descend'))
+% disp(sort(actualTrainOutput,'descend'))
+
+
+total_steps = otherVariables{1};
+Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
+Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
+
+if total_steps == maxIterations * batchSize
+    disp('Max iterations reached')
+else
+    disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
+end
+
 disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
 % plot for training vs testing
@@ -53,7 +67,8 @@ disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 % title('Comparison of training and testing accuracies')
 
 % plot for testing accuracy
-figure
+figure;
+% subplot(2,1,1)
 hold on
 grid on
 
@@ -65,15 +80,17 @@ xlabel('x')
 ylabel('f(x) = 1/x')
 title('Comparison of training accuracy wrt desired output')
 legend('Learnt Function','Actual Function')
-% plot(trainInput,abs(trainOutput - actualTrainOutput));
-% 
-% xlabel('x')
-% ylabel('RMS error : calculated from scaled error of all train/test patterns')
-% title('Learning History')
+
+figure; plot(Erms_train(2,:),Erms_train(1,:)); hold on;  plot(Erms_test(2,:),Erms_test(1,:));
+
+xlabel('Training steps')
+ylabel('RMS error : Of scaled train/test patterns')
+title('Learning History')
+legend('Training Errors','Testing Errors')
 end
 
 
-function [weightMatrices, otherVariables] = train(trainInput, trainOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha)
+function [weightMatrices, otherVariables] = train(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points)
 
 % The actual neural network in this function
 
@@ -82,7 +99,17 @@ function [weightMatrices, otherVariables] = train(trainInput, trainOutput, numNo
 % weights go 1,2  
 % delta go 1 to 2
 
+% Error initialization and other variables
+total_steps = maxIterations * batchSize;
 otherVariables = cell(3,1); % for storing total_steps, Erms_store_train, Erms_store_test
+eval_interval = maxIterations / eval_points;
+Erms_train = zeros(2,eval_points); Erms_test = Erms_train; % stores the RMS error every m iterations (m = eval_interval)
+% initial error
+dum = 1; % dummy index for storing RMS errors at frequent intervals while training
+frozenTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+frozenTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
+Erms_train(1,dum) = computeRMSE(trainOutput,frozenTrainOutput); Erms_train(2,dum) = 0;  % store errors and learning steps
+Erms_test(1,dum) = computeRMSE(testOutput,frozenTestOutput); Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
 
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
@@ -90,7 +117,7 @@ if batchSize > length(trainInput)
 end
 
 oldWeightDeltas = createWeightDeltas(numNodes);
-
+% big loop
 for i = 1:maxIterations % big loop
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
@@ -122,7 +149,6 @@ for i = 1:maxIterations % big loop
         % backward propagation
         m = length(numNodes);
         currentLayerOutput = layerOutputs{m};
-        previousLayerOutput = layerOutputs{m-1};
         
         nodeDeltas{m-1} = diag(hyperbolicTangentDerivative(tanhSlope, currentLayerOutput)) * (desiredOutput - currentLayerOutput);
         for m = length(numNodes)-1:-1:2 % going over layers
@@ -139,22 +165,28 @@ for i = 1:maxIterations % big loop
     weightDeltas = updateWeights(weightDeltas, oldWeightDeltas, alpha);
     weightMatrices = updateWeights(weightMatrices, weightDeltas, 1);
     oldWeightDeltas = weightDeltas;
-%     frozenTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-%     frozenTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
-%     RMSE_train = computeRMSE(trainOutput,frozenTrainOutput);
-%     RMSE_test = computeRMSE(testOutput,frozenTestOutput);
-%     
+    
+    if mod(i,eval_interval) == 0
+        dum = i/eval_interval + 1;
+        frozenTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
+        frozenTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
+        RMSE_train = computeRMSE(trainOutput,frozenTrainOutput);
+        RMSE_test = computeRMSE(testOutput,frozenTestOutput);
+        Erms_train(1,dum) = RMSE_train; Erms_train(2,dum) = i*k;  % store errors and learning steps
+        Erms_test(1,dum) = RMSE_test; Erms_test(2,dum) = i*k; % store errors and learning steps
+    end
+        
 %     if RMSE_train < errorTolerance
-%         total_steps = (i-1)* size(trainInput,1) + j; % steps taken to complete the training
-%         Erms_store_train = Erms_store_train(:,Erms_store_train(1,:) ~= 0); % clip the Error storage matrix when terminating
+%         total_steps = (i-1)* size(trainInput,1) + k; % steps taken to complete the training
+%         Erms_train = Erms_train(:,Erms_train(1,:) ~= 0); Erms_test = Erms_test(:,Erms_test(1,:) ~= 0); % clip the Error storage matrix when terminating
 %         return
 %     end
 %     
-%     if mod(i*j,eval_interval) == 0
-%         Erms_store_train(1,dum) = RMSE_train; Erms_store_train(2,dum) = i*j; dum = dum + 1; % store errors and learning steps
-%         Erms_store_test(1,dum) = RMSE_test; Erms_store_test(2,dum) = i*j; % store errors and learning steps
-%     end
 end
+
+otherVariables{1} = total_steps;
+otherVariables{2} = Erms_train;
+otherVariables{3} = Erms_test;
 
 end
 
@@ -162,8 +194,6 @@ end
 function hiddenNodeDeltas = computeTheNodeDeltas(nodeDeltas, tanhSlope, layerIndex,layerOutputs, weightMatrices)
 % enters into this function to calculate nodeDeltas recursively for each
 % layer in the loop
-previousLayerOutput = layerOutputs{layerIndex};
-currentLayerWeightVector = weightMatrices{layerIndex};
 nextLayerWeightVectorTranspose = weightMatrices{layerIndex+1}';
 nextLayerDeltaVector = nodeDeltas{layerIndex+1};
 
@@ -210,13 +240,13 @@ RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) / length(desiredOutput));
 end
 
 
-function weightMatrices = createWeightMatrices(numNodes)
+function weightMatrices = createWeightMatrices(numNodes, weightScale)
 
 numMatrices = length(numNodes) - 1;
 weightMatrices = cell(1, numMatrices);
 
 for j = 1:numMatrices
-    weightMatrices{j} = rand(numNodes(j+1), numNodes(j)+1);
+    weightMatrices{j} = rand(numNodes(j+1), numNodes(j)+1) .* weightScale(1) - weightScale(2);
     if j ~= numMatrices
         weightMatrices{j}(end+1,:) = zeros(1,length(weightMatrices{j}(end,:)));
     end
