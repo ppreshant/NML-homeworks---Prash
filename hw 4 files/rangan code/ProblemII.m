@@ -11,12 +11,12 @@ learningRate = 1/batchSize;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 10000;
+maxIterations = 3000;
 errorTolerance = 0.08;
 
 N_training_pts = 200; % number of training patterns
 
-trainInput = linspace(0.11,1.0,N_training_pts)';
+trainInput = linspace(0.1,1.0,N_training_pts)';
 trainOutput = multiplicativeInverseFunction(trainInput);
 
 maxTrainScale = max(trainOutput);
@@ -121,7 +121,7 @@ for i = 1:maxIterations % big loop
         currentLayerOutput = layerOutputs{m};
         previousLayerOutput = layerOutputs{m-1};
         
-        nodeDeltas{m-1} = diag(hyperbolicTangentDerivative(tanhSlope, weightMatrices{m-1} * previousLayerOutput')) * (desiredOutput - currentLayerOutput);
+        nodeDeltas{m-1} = diag(hyperbolicTangentDerivative(tanhSlope, currentLayerOutput)) * (desiredOutput - currentLayerOutput);
         for m = length(numNodes)-1:-1:2 % going over layers
                         
             previousLayerOutput = layerOutputs{m-1};
@@ -152,6 +152,9 @@ for i = 1:maxIterations % big loop
 %     end
 end
 
+otherVariables{1} = total_steps;
+otherVariables{2} = Erms_training;
+otherVariables{3} = Erms_testing;
 end
 
 
@@ -163,7 +166,7 @@ currentLayerWeightVector = weightMatrices{layerIndex};
 nextLayerWeightVectorTranspose = weightMatrices{layerIndex+1}';
 nextLayerDeltaVector = nodeDeltas{layerIndex+1};
 
-derivative = hyperbolicTangentDerivative(tanhSlope, currentLayerWeightVector * previousLayerOutput');
+derivative = hyperbolicTangentDerivative(tanhSlope, layerOutputs{layerIndex+1});
 
 hiddenNodeDeltas = diag(derivative) * nextLayerWeightVectorTranspose * nextLayerDeltaVector;
 
@@ -249,16 +252,16 @@ end
 end
 
 
-function f = hyperbolicTangentDerivative(a,x)
+function f = hyperbolicTangentDerivative(a,fx)
 
-f = a .* (1 - hyperbolicTangentFunction(a,x) .^ 2);
+f = a .* (1 - fx .^ 2);
 
 end
 
 
 function f = hyperbolicTangentFunction(a,x)
-
-f = (exp(a .* x) - exp(-a .* x)) ./ (exp(a .* x) + exp(-a .* x));
+xp = 2*a.*x;
+f = (exp(xp) -1) ./ (exp(xp) + 1);
 
 end
 
