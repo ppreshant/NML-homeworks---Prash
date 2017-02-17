@@ -1,5 +1,6 @@
 function ProblemII
-% Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I, ProblemI
+% Prashant Kalvapalle, Ragib Mostofa
+% COMP 502, Spring 2017, Homework Assignment IV Part II, Problem II
 % 
 
 batchSize = 200;  % set the size of the batch, i.e. number of patterns per batch
@@ -9,11 +10,11 @@ numNodes = [1, 10, 1];  % set the number of nodes in each layers in the neural n
 weightMatrices = createWeightMatrices(numNodes,[1,0]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
 
 learningRate = 1/batchSize;
-alpha = .5; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
+alpha = 0; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 12000;  % number of times each batch is processed ; can terminate before if converged
+maxIterations = 100000;  % number of times each batch is processed ; can terminate before if converged
 errorTolerance = 0.02;  % unscaled error tolerance 
 
 N_training_pts = 200;  % number of training patterns selected between 0.1 and 1
@@ -26,6 +27,8 @@ scaledTrainOutput = trainOutput ./ maxTrainScale;
 
 testInput = rand(N_training_pts/2,1) * 0.9 + 0.1;
 testOutput = multiplicativeInverseFunction(testInput);
+[testInput, sortIndices] = sort(testInput,'ascend');
+testOutput = testOutput(sortIndices);
 
 maxTestScale = max(testOutput);
 % scaledTestInput = testInput .* maxTestScale; % dont have to scale input
@@ -33,11 +36,10 @@ scaledTestOutput = testOutput ./ maxTestScale;
 
 [weightMatrices,otherVariables] = train(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
 
-% actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
+actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
 actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
 % actualTrainOutput = sort(actualTrainOutput,'descend');
 % disp(sort(actualTrainOutput,'descend'))
-
 
 total_steps = otherVariables{1};
 Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
@@ -53,25 +55,54 @@ disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
 % plot for Training accuracy
 figure;
-% subplot(2,1,1)
-hold on
-grid on
 
 plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
-hold on;
+hold on
 plot(trainInput,trainOutput);
 
+grid on
 xlabel('x')
 ylabel('f(x) = 1/x')
-title('Comparison of training accuracy wrt desired output')
+title('Comparison of actual training curve wrt desired output')
 legend('Learnt Function','Actual Function')
 
+% plot for Testing accuracy
+figure;
+
+plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
+hold on;
+plot(testInput,testOutput);
+
+grid on
+xlabel('x')
+ylabel('f(x) = 1/x')
+title('Comparison of actual testing accuracy wrt desired output')
+legend('Learnt Function','Actual Function')
+
+% plot for Training/Testing accuracy
+figure;
+
+plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
+hold on
+plot(trainInput,trainOutput);
+plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
+plot(testInput,testOutput);
+
+grid on
+xlabel('x')
+ylabel('f(x) = 1/x')
+title('Comparison of actual training and testing accuracy wrt desired output')
+legend('Training Learnt Function','Training Actual Function','Testing Learnt Function','Testing Actual Function')
+
+% plot Learning History
 figure; plot(Erms_train(2,:),Erms_train(1,:)); hold on;  plot(Erms_test(2,:),Erms_test(1,:));
 
+grid on
 xlabel('Learning Steps')
 ylabel('RMS error : All Unscaled train/test patterns')
 title('Learning History')
 legend('Training Errors','Testing Errors')
+
 end
 
 
@@ -221,7 +252,7 @@ end
 
 function RMSE = computeRMSE(desiredOutput, actualOutput)
 
-RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) / length(desiredOutput));
+RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ length(desiredOutput));
 
 end
 
@@ -277,7 +308,9 @@ end
 
 
 function f = hyperbolicTangentFunction(a,x)
+
 xp = 2*a.*x;
+
 f = (exp(xp) -1) ./ (exp(xp) + 1);
 
 end
@@ -288,3 +321,5 @@ function f = multiplicativeInverseFunction(x)
 f = 1 ./ x;
 
 end
+
+
