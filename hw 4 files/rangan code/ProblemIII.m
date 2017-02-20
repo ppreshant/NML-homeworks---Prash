@@ -22,7 +22,7 @@ for i = 1:length(numHiddenNodes)
     
     tanhSlope = 1;  % set the slope of the hyperbolic tangent function
     
-    maxIterations = 30000;  % number of times each batch is processed ; can terminate before if converged
+    maxIterations = 100000;  % number of times each batch is processed ; can terminate before if converged
     errorTolerance = 0.00;  % scaled error tolerance (for inputs between [.1 - 1])
     
     N_training_pts = 200;  % number of training patterns selected between 0.1 and 1
@@ -51,13 +51,6 @@ for i = 1:length(numHiddenNodes)
     Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
     Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
     
-%     if total_steps == maxIterations * batchSize
-%         disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
-%     else
-%         disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
-%     end
-%     
-%     disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
     RMSEforDifferentParameter(1,i) = computeRMSE(trainOutput,actualTrainOutput);  % store the final RMSD values for TRAINING data
     RMSEforDifferentParameter(2,i) = computeRMSE(testOutput,actualTestOutput);  % store the final RMSD values for TESTING data
     
