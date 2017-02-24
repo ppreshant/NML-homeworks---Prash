@@ -3,114 +3,122 @@ function ProblemII
 % Prashant Kalvapalle, Ragib Mostofa
 % COMP 502, Spring 2017, Homework Assignment IV Part II, Problem II
 % 
+weightsRanges = .1:.1:.5;   % weight range of .1 means initial weights go from -0.1 to 0.1 
+RMSEforDifferentParameter = zeros(1,length(weightsRanges));
+stepsConvforDifferentParameter = zeros(1,length(weightsRanges));
+   % plots of desired outputs with axes labels, titles and legends
+    % plot for Training accuracy
+figure(1); figure(2);     
+set(figure(1), 'Visible', 'off'); set(figure(2), 'Visible', 'off'); 
 
-batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
-eval_points = 100; % number of points in the learning history or error vs time graph
+for i = 1:length(weightsRanges)
+    weightIndex = weightsRanges(i);
+    batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
+    eval_points = 100; % number of points in the learning history or error vs time graph
+    
+    numNodes = [1, 80, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
+    weightMatrices = createWeightMatrices(numNodes,[2*weightIndex,weightIndex]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
+    
+    learningRate = 4e-1;
+    alpha = 0.9; % forgetting rate for momentum term >> Make it 0 for no momentum correction
+    
+    tanhSlope = 1;  % set the slope of the hyperbolic tangent function
+    
+    maxIterations = 5e5;  % number of times each batch is processed ; can terminate before if converged
+    errorTolerance = 0.018;  % scaled error tolerance (for inputs between [.1 - 1])
+    
+    N_training_pts = 100;  % number of training patterns selected between 0.1 and 1
+    A = 1; B = .2;
+    
+    %% Input and Output samples for TRAINING the BP network
+    nValues = (1:N_training_pts)';
+    trainOutput = 2 * sin( 2*pi*nValues/20);
+    trainInput = A*trainOutput + B*trainOutput.^2;
+    
+    % trainInput = 2 * sin( 2*pi*nValues/20);
+    % trainOutput = A*trainInput + B*trainInput.^2;
+    
+    maxTrainScale = max(trainOutput);
+    scaledTrainOutput = trainOutput ./ maxTrainScale;  % scaling the output to lie between [.1,1]
+    
+    %% Input and Output samples for TESTING the BP network
+    testInput = trainInput;
+    testOutput =trainOutput;
+    [testInput, sortIndices] = sort(testInput,'ascend');
+    testOutput = testOutput(sortIndices);
+    
+    maxTestScale = max(testOutput);
+    scaledTestOutput = testOutput ./ maxTestScale;  % scaling the output to lie between [.1,1]
+    
+    %% calling the BPtraining algorithm
+    [weightMatrices,otherVariables] = BPLearn(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
+    
+    actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
+    actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
+    % actualTrainOutput = sort(actualTrainOutput,'descend');
+    % disp(sort(actualTrainOutput,'descend'))
+    
+    total_steps = otherVariables{1};
+    Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
+    Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
+    
+    if total_steps == maxIterations * batchSize
+        disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
+    else
+        disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
+    end
+    
+%     disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
+  
+RMSEforDifferentParameter(1,i) = computeRMSE(trainOutput,actualTrainOutput);  % store the final RMSD values for TRAINING data
+stepsConvforDifferentParameter(1,i) = total_steps;
+%     RMSEforDifferentParameter(2,i) = computeRMSE(testOutput,actualTestOutput);  % store the final RMSD values for TESTING data
 
-numNodes = [1, 80, 1];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
-weightMatrices = createWeightMatrices(numNodes,[.6,.3]);  % create the weight matrices for each hidden layer and output layer - randperm * [first element] - [second element]
+% plot for Training accuracy
+set(groot,'CurrentFigure',1); plot(nValues,actualTrainOutput,'--'); hold on;
 
-learningRate = 4e-1;
-alpha = 0.9; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
+%     % plot for Testing accuracy
+%     set(groot,'CurrentFigure',2); plot(sort(testInput,'descend'),sort(actualTestOutput),'--'); hold on;
 
-tanhSlope = 1;  % set the slope of the hyperbolic tangent function
+% Learning history for Training
+set(groot,'CurrentFigure',2); plot(Erms_train(2,:),Erms_train(1,:)); hold on;
 
-maxIterations = 5e5;  % number of times each batch is processed ; can terminate before if converged
-errorTolerance = 0.018;  % scaled error tolerance (for inputs between [.1 - 1])
-
-N_training_pts = 100;  % number of training patterns selected between 0.1 and 1
-A = 1; B = .2;
-
-%% Input and Output samples for TRAINING the BP network
-nValues = (1:N_training_pts)'; 
-trainOutput = 2 * sin( 2*pi*nValues/20); 
-trainInput = A*trainOutput + B*trainOutput.^2;
-
-% trainInput = 2 * sin( 2*pi*nValues/20); 
-% trainOutput = A*trainInput + B*trainInput.^2;
-
-maxTrainScale = max(trainOutput);
-scaledTrainOutput = trainOutput ./ maxTrainScale;  % scaling the output to lie between [.1,1]
-
-%% Input and Output samples for TESTING the BP network
-testInput = trainInput;
-testOutput =trainOutput;
-[testInput, sortIndices] = sort(testInput,'ascend');
-testOutput = testOutput(sortIndices);
-
-maxTestScale = max(testOutput);
-scaledTestOutput = testOutput ./ maxTestScale;  % scaling the output to lie between [.1,1]
-
-%% calling the BPtraining algorithm
-[weightMatrices,otherVariables] = BPLearn(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
-
-actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
-actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
-% actualTrainOutput = sort(actualTrainOutput,'descend');
-% disp(sort(actualTrainOutput,'descend'))
-
-total_steps = otherVariables{1};
-Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
-Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
-
-if total_steps == maxIterations * batchSize
-    disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
-else
-    disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
+%     % Learning history for Testing data
+%     set(groot,'CurrentFigure',4); plot(Erms_test(2,:),Erms_test(1,:)); hold on;
 end
 
-disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
-
 %% plot for Training accuracy
-figure;
+figure(1);
 
-plot(nValues,actualTrainOutput,'--');
-hold on
 plot(nValues,trainOutput);
+xlim([0 20]);
 
 grid on
 xlabel('n')
 ylabel('Signal')
-title('Comparison of actual training curve wrt desired output')
-legend('Learnt Function','Actual Function')
-
-%% % plot for Testing accuracy
-% figure;
-% 
-% plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-% hold on;
-% plot(testInput,testOutput);
-% 
-% grid on
-% xlabel('x')
-% ylabel('f(x) = 1/x')
-% title('Comparison of actual testing accuracy wrt desired output')
-% legend('Learnt Function','Actual Function')
-
-%% % plot for Training/Testing accuracy
-% figure;
-% 
-% plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
-% hold on
-% plot(trainInput,trainOutput);
-% plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-% plot(testInput,testOutput);
-% 
-% grid on
-% xlabel('x')
-% ylabel('f(x) = 1/x')
-% title('Comparison of actual training and testing accuracy wrt desired output')
-% legend('Training Learnt Function','Training Actual Function','Testing Learnt Function','Testing Actual Function')
-
+title('Training curves for different Weight initialization parameters')
+legend([' Weight range = -', num2str(weightsRanges(1)),'to ',num2str(weightsRanges(1))], [' Weight range = -', num2str(weightsRanges(2)),'to ',num2str(weightsRanges(2))], [' Weight range = -', num2str(weightsRanges(3)),'to ',num2str(weightsRanges(3))], [' Weight range = -', num2str(weightsRanges(4)),'to ',num2str(weightsRanges(4))], [' Weight range = -', num2str(weightsRanges(5)),'to ',num2str(weightsRanges(5))], 'Desired output');
 %% plot Learning History
-figure; plot(Erms_train(2,:),Erms_train(1,:)); %hold on;  plot(Erms_test(2,:),Erms_test(1,:));
+figure(2); %plot(Erms_train(2,:),Erms_train(1,:)); %hold on;  plot(Erms_test(2,:),Erms_test(1,:));
 
 grid on
 xlabel('Learning Steps')
 ylabel('RMS error : All Unscaled train/test patterns')
-title('Learning History')
-legend('Training Errors')%,'Testing Errors')
+title('Learning History for different Weight initialization parameters')
+legend([' Weight range = -', num2str(weightsRanges(1)),'to ',num2str(weightsRanges(1))], [' Weight range = -', num2str(weightsRanges(2)),'to ',num2str(weightsRanges(2))], [' Weight range = -', num2str(weightsRanges(3)),'to ',num2str(weightsRanges(3))], [' Weight range = -', num2str(weightsRanges(4)),'to ',num2str(weightsRanges(4))], [' Weight range = -', num2str(weightsRanges(5)),'to ',num2str(weightsRanges(5))]);
+%% plot for final RMSE with various parameters
+figure(3);
+yyaxis left
+plot(weightsRanges,RMSEforDifferentParameter);
+ylabel('Final RMSE')
 
+yyaxis right
+plot(weightsRanges,stepsConvforDifferentParameter);
+
+grid on
+xlabel('Absolute value of limits of Weight Initializations')
+ylabel('Steps to Convergence')
+title('Testing curves for different Weight initialization parameters')
 end
 
 
