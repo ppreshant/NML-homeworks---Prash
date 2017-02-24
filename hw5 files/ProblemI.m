@@ -1,16 +1,21 @@
-function ProblemIV
+function ProblemI
 % Ragib Mostofa, COMP 502, Spring 2017, Homework Assignment IV Part I,
 % ProblemIV
 % 
+
+foldCount = 3;
+
 trainDataFilename = 'iris-train copy.txt';
 testDataFilename = 'iris-test copy.txt';
 
 [trainInput,trainOutput] = loadData(trainDataFilename);
 [testInput,testOutput] = loadData(testDataFilename);
 
+folds = crossValidation(foldCount, trainInput, trainOutput, testInput, testOutput);
+
 batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
 
-numNodes = [4, 4, 3];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
+numNodes = [4, 2, 3];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
 weightMatrices = createWeightValues(numNodes);  % create the weight matrices for each hidden layer and output layer
 
 learningRate = 0.1;
@@ -18,54 +23,59 @@ learningRate = 0.1;
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 1000;
+maxIterations = 2000;
 errorTolerance = 0.10;
 
-[weightMatrices,trainAccHistory,testAccHistory] = train(trainInput, trainOutput, testInput, testOutput,  numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
+for currentFoldIndex = 1:foldCount
+    TrainFoldIn = folds{currentFoldIndex,1};
+    TestFoldIn  = folds{currentFoldIndex,3};
+    
+    TrainFoldOut = folds{currentFoldIndex,2};
+    TestFoldOut  = folds{currentFoldIndex,4};
+    
+    [weightMatrices,trainAccHistory,testAccHistory] = train(TrainFoldIn, TrainFoldOut, TestFoldIn, TestFoldOut,  numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance);
 
-actualTrainOutput = test(trainInput, tanhSlope, numNodes, weightMatrices);
-thresholdedTrainOutput = threshold(actualTrainOutput);
+    actualTrainOutput = test(TrainFoldIn, tanhSlope, numNodes, weightMatrices);
+    thresholdedTrainOutput = threshold(actualTrainOutput);
 
-actualTestOutput = test(testInput, tanhSlope, numNodes, weightMatrices);
-thresholdedTestOutput = threshold(actualTestOutput);
-
-% thresholdedTrainOutput
-
-% thresholdedTrainOutput == trainOutput
-
-% thresholdedTestOutput
-
-% thresholdedTestOutput == testOutput
-
-trainAcc = classificationAccuracy(trainOutput,thresholdedTrainOutput);
-testAcc = classificationAccuracy(testOutput,thresholdedTestOutput);
-disp(['Training accuracy = ',num2str(trainAcc * 100),'%'])
-disp(['Testing accuracy = ',num2str(testAcc * 100),'%'])
-
-% plot for Training/Testing accuracy
-% figure;
-% 
-% plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
-% hold on
-% plot(trainInput,trainOutput);
-% plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-% plot(testInput,testOutput);
-% 
-% grid on
-% xlabel('x')
-% ylabel('f(x) = 1/x')
-% title('Comparison of actual training and testing accuracy wrt desired output')
-% legend('Training Learnt Function','Training Actual Function','Testing Learnt Function','Testing Actual Function')
-
-% plot Learning History
-figure; plot(trainAccHistory(2,:),trainAccHistory(1,:)); hold on;  plot(testAccHistory(2,:),testAccHistory(1,:));
-
-grid on
-xlabel('Learning Steps')
-ylabel('Classification accuracy % (misclassified/total)')
-title('Learning History')
-legend('Training Accuracy','Testing Accuracy')
-
+    actualTestOutput = test(TestFoldIn, tanhSlope, numNodes, weightMatrices);
+    thresholdedTestOutput = threshold(actualTestOutput);
+    
+    trainAcc = classificationAccuracy(TrainFoldOut,thresholdedTrainOutput);
+    testAcc = classificationAccuracy(TestFoldOut,thresholdedTestOutput);
+    disp(['Training accuracy = ',num2str(trainAcc * 100),'%'])
+    disp(['Testing accuracy = ',num2str(testAcc * 100),'%'])
+    
+    % plot for Training/Testing accuracy
+    % figure;
+    %
+    % plot(sort(trainInput,'descend'),sort(actualTrainOutput),'--');
+    % hold on
+    % plot(trainInput,trainOutput);
+    % plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
+    % plot(testInput,testOutput);
+    %
+    % grid on
+    % xlabel('x')
+    % ylabel('f(x) = 1/x')
+    % title('Comparison of actual training and testing accuracy wrt desired output')
+    % legend('Training Learnt Function','Training Actual Function','Testing Learnt Function','Testing Actual Function')
+    
+    % plot Learning History
+    figure; plot(trainAccHistory(2,:),trainAccHistory(1,:)); hold on;  plot(testAccHistory(2,:),testAccHistory(1,:));
+    
+    grid on
+    xlabel('Learning Steps')
+    ylabel('Classification accuracy % (misclassified/total)')
+    title(['Learning History (Testing Fold: ',num2str(currentFoldIndex),')'])
+    legend('Training Accuracy','Testing Accuracy')
+    
+    [traincM, trainAccuracy] = confusionMatrix(TrainFoldOut,thresholdedTrainOutput);
+    [testcM, testAccuracy] = confusionMatrix(TestFoldOut,thresholdedTestOutput);
+    
+    creativePlots(true,currentFoldIndex,TrainFoldOut,thresholdedTrainOutput)
+    creativePlots(false,currentFoldIndex,TestFoldOut,thresholdedTestOutput)
+end
 
 end
 
@@ -309,8 +319,105 @@ accuracy = numCorrect / numTrials;
 
 end
 
-function c = creativePlots(desiredOutput,thresholdedActualOutput)
-figure
-xaxis = 1:size(desiredOutput,1);
+
+function creativePlots(train_or_test,i,desiredOutput,thresholdedActualOutput)
+% takes the desired and actual outputs and plots the comparision graph
+xaxis = 1:size(desiredOutput,1); % create sequence of 1:75 (or number of data points)
+
+[~, desiredSeq] =  max(desiredOutput');  % isolate which category the classification is
+[~, actualSeq] =  max(thresholdedActualOutput'); % converts the 2-d matrix into a sequence of numbers
+
+[~, seq] = sort(desiredSeq);    % finds the indices for sorting in ascending order
+% oxaxis = xaxis(seq); % for x axis tick values if needed
+odesiredSeq = desiredSeq(seq); oactualSeq = actualSeq(seq);
+
+figure;
+plot(xaxis,odesiredSeq,'ko'); hold on;
+plot(xaxis,oactualSeq,'b.','MarkerSize',15)
+ylim([0.5 3.5])
+xlim([0 76])
+% xlabel('Learning Steps')
+yticks([1 2 3])
+yticklabels({'Setosa','Versacolor','Virginica'})
+ylabel('Type of flower')
+if train_or_test
+    title(['Actual vs Desired Training Data Classification (Testing Fold: ',num2str(i),')'])
+else
+    title(['Actual vs Desired Testing Data Classification (Testing Fold: ',num2str(i),')'])
+end
+legend('Desired classification','Actual classification')
+grid on
 
 end
+
+
+function [cM, accuracy] = confusionMatrix(desiredOutput,thresholdedActualOutput)
+%  outputs the confusion matrix (as a table) and the accuracy in %
+% A vectorized way to arrive at the confusion matrix 
+a = desiredOutput; b = thresholdedActualOutput;
+% diagel = diag(sum(a == b)); % count all elements that match
+anm = a .* (a~= b); anm = anm(logical(sum(anm')),:); % make reduced matrices for elements that don't match
+bnm = b .* (a~= b); bnm = bnm(logical(sum(bnm')),:);
+otherel = anm' * bnm;  % a quick way to find which element was wrongly classified as which
+diagel = diag(sum(a) - sum(otherel,2)'); % count all elements that match (by subtracting unmatched ones)
+cM = diagel + otherel;
+
+names = {'Set', 'Ver','Vir'};
+cM = array2table(cM,'VariableNames', names, 'RowNames', names);
+
+accuracy = sum(sum(diagel))/sum(sum(a)) * 100;
+% disp(['Classification accuracy = ',num2str( accuracy)]);
+end
+
+
+function folds = crossValidation(numFolds, trainInput, trainOutput, testInput, testOutput)
+
+randomTrainIndices = randperm(size(trainInput,1));
+randomTestIndices = randperm(size(testInput,1));
+
+randomizedTrainInput = trainInput;
+randomizedTrainOutput = trainOutput;
+
+randomizedTestInput = testInput;
+randomizedTestOutput = testOutput;
+    
+folds = cell(numFolds,4);
+
+aggregateInput = [randomizedTrainInput; randomizedTestInput];
+aggregateOutput = [randomizedTrainOutput; randomizedTestOutput];
+
+% print warning if this will not fold evenly
+if mod(size(aggregateInput,1),numFolds) ~= 0
+    error('This will not fold evenly');
+end
+
+foldSize = ceil(size(aggregateInput,1) / numFolds);
+
+for i = 1:numFolds
+    
+    if i == numFolds
+        maximumTestIndex = size(aggregateInput,1);
+    else
+        maximumTestIndex = i * foldSize;
+    end
+    
+    minimumTestIndex = (i-1) * foldSize + 1;
+        
+    currentTrainInput = [aggregateInput(1:minimumTestIndex-1,:);
+                         aggregateInput(maximumTestIndex+1:size(aggregateInput,1),:)];
+    currentTrainOutput = [aggregateOutput(1:minimumTestIndex-1,:);
+                          aggregateOutput(maximumTestIndex+1:size(aggregateInput,1),:)];
+
+                      currentTestInput = aggregateInput(minimumTestIndex:maximumTestIndex,:);
+    currentTestOutput = aggregateOutput(minimumTestIndex:maximumTestIndex,:);
+    
+    folds{i,1} = currentTrainInput;
+    folds{i,2} = currentTrainOutput;
+    folds{i,3} = currentTestInput;
+    folds{i,4} = currentTestOutput;
+    
+end
+
+end
+
+
