@@ -6,15 +6,14 @@ function SOM2
 % NOTE : Initial and final lattice is a cell representation, In the function it is
 % used as a multi-dimensional matrix
 
-latticeSize = [10 10]; 
+latticeSize = [8 8]; 
 initRadius = max(latticeSize); % Initial radius of influence
 
 numIters = 50000; % number of learning steps
 alphaI = .8; % learning rate
 
-dataInput = rand(2,4000); % each COLUMN is a data point
-% dummy data
-% dataInput = [rand(2,2000) 1 + rand(2,100)]; % each column is a data point
+% Input data entry
+dataInput = [createGaussians([2 1000],.1,[7 7]), createGaussians([2 1000],.1,[0 7]), createGaussians([2 1000],.1,[7 0]), createGaussians([2 1000],.1,[0 0]),]; % each COLUMN is a data point
 
 dimDataInput = size(dataInput,1); % gives the dimensionality of data space
 latticeCell = createInitLattice(dimDataInput,latticeSize); % weights initialization
@@ -23,8 +22,7 @@ latticeCell = createInitLattice(dimDataInput,latticeSize); % weights initializat
 finalLattice = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI);
 
 % giving the final weights of the lattice in Cell form
-finalLatticeCell = mat2cell(finalLattice,[ones(1,latticeSize(1))],[ones(1,latticeSize(2))],2);
-finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
+finalLatticeCell = mat2cell(finalLattice,ones(1,latticeSize(1)),ones(1,latticeSize(2)),2); finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
 
 % % Plot the mapping and input data
 % figure;
@@ -128,6 +126,14 @@ function latticeCell = createInitLattice(dimDataInput,latticeSize)
 % creates random weight vectors in a cell 
 latticeCell = cell(latticeSize);
 latticeCell = arrayfun(@(x) rand(dimDataInput,1),latticeCell, 'uni',0);
+end
+
+
+function x1 = createGaussians(dim,var,mean)
+x1 = sqrt(var)*randn(dim(1),dim(2));
+% x1=detrend(x1);
+x1(1,:) = x1(1,:) + mean(1);
+x1(2,:) = x1(2,:) + mean(2);
 end
 
 
