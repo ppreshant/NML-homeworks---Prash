@@ -21,7 +21,10 @@ latticeCell = createInitLattice(dimDataInput,latticeSize); % weights initializat
 
 % Perform self organization
 finalLattice = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI);
-% finalLatticeCell = 
+
+% giving the final weights of the lattice in Cell form
+finalLatticeCell = mat2cell(finalLattice,[ones(1,latticeSize(1))],[ones(1,latticeSize(2))],2);
+finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
 
 % % Plot the mapping and input data
 % figure;
