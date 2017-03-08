@@ -55,7 +55,7 @@ dI = reshape(dataInput',[],4,2);
 plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
 plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
 xlabel('First data dimension'); ylabel('Second data dimension'); title('Plot of prototypes in input space : Initial')
-legend('Input data vectors','Prototype vectors')
+legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
 
 dum = 2;
 [~, oldMapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
@@ -104,7 +104,7 @@ alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIte
         plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
         plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
         xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
-        legend('Input data vectors','Prototype vectors')
+        legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
         dum = dum + 1;
     end
     % making plots every 1000 learning steps to visually approximate
@@ -117,7 +117,7 @@ alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIte
         plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
         plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
         xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
-        legend('Input data vectors','Prototype vectors')
+        legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
         hold off; 
         drawnow; 
 %         dum = dum + 1;
