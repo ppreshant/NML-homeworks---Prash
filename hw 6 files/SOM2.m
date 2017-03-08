@@ -1,9 +1,9 @@
-% hw6 Problem 1
+% hw6 Problem 2
 function SOM2
 % Prashant Kalvapalle 
 % Comp 504 HW6 - Base code for all problems
 
-% NOTE : Initial and final lattice is a cell representation, In the function it is
+% NOTE : Initial (and final) lattice is a cell representation, In the function it is
 % used as a multi-dimensional matrix
 
 latticeSize = [8 8]; 
@@ -19,10 +19,10 @@ dimDataInput = size(dataInput,1); % gives the dimensionality of data space
 latticeCell = createInitLattice(dimDataInput,latticeSize); % weights initialization
 
 % Perform self organization
-finalLattice = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI);
+[finalLattice, stepsToConv] = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI);
 
-% giving the final weights of the lattice in Cell form
-finalLatticeCell = mat2cell(finalLattice,ones(1,latticeSize(1)),ones(1,latticeSize(2)),2); finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
+% % giving the final weights of the lattice in Cell form
+% finalLatticeCell = mat2cell(finalLattice,ones(1,latticeSize(1)),ones(1,latticeSize(2)),2); finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
 
 % % Plot the mapping and input data
 % figure;
@@ -30,14 +30,22 @@ finalLatticeCell = mat2cell(finalLattice,ones(1,latticeSize(1)),ones(1,latticeSi
 % plot(finalLattice(:,:,1),finalLattice(:,:,2),'k-'); plot(finalLattice(:,:,1)',finalLattice(:,:,2)','b-');
 % xlabel('First data dimension'); ylabel('Second data dimension'); title('Self organised clusters')
 
-densityLattice = calcDensityLattice(finalLattice,dataInput,size(latticeCell));
+[densityLattice, ~, histoData] = calcDensityLattice(finalLattice,dataInput,size(latticeCell));
 densityLattice = mat2gray(densityLattice);
 figure; imagesc(densityLattice); colormap(flipud(gray)); colorbar
+
+if stepsToConv < numIters
+    disp(['SOM Converged in ',num2str(stepsToConv),' steps'])
+else 
+    disp(['Maximum iterations exhausted = ',num2str(stepsToConv),' steps'])
+end
+
+plotHistoChart(histoData);
 
 end
 
 
-function finalLattice = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI)
+function [finalLattice, stepsToConv] = selfOrganize(latticeCell,dataInput,numIters,initRadius,alphaI)
 % the self organizing map steps here
 
 % convert the input lattice cell into a multi-dimensional Matrix 
@@ -47,18 +55,22 @@ lattice = cell2mat(Z); % this is a multi-dimensional Matrix, with third dimensio
 r = (1:size(lattice,1))';c = 1:size(lattice,2); 
 latticeIndices(:,:,1) = r(:,ones(1,size(lattice,2))); latticeIndices(:,:,2) = c(ones(1,size(lattice,1)),:);  % latticeIndices : holds the i,j indices of the 2d lattice space
 
-figure;
+figure(1);
 subplot(2,2,1);
 plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
 plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
 xlabel('First data dimension'); ylabel('Second data dimension'); title('Plot of prototypes in input space : Initial')
 legend('Input data vectors','Prototype vectors')
+
 dum = 2;
+[~, oldMapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
+stepsToConv = numIters;
 
 for i = 1:numIters
 %     radius = initRadius; % can do decay here
-    radius = initRadius * ((i <= numIters/5) + .8 * (i > numIters/5 & i <= numIters/2) + .5 * (i > numIters/2 & i <= numIters*.8)+ .2 * (i > numIters*.8));
-    alpha = alphaI * ((i <= numIters/10) + .5 * (i > numIters/10 & i <= numIters/2.5) + .125 * (i > numIters/2.5 & i <= numIters*.8)+ .025 * (i > numIters*.8));
+decayIters = 10000;
+radius = initRadius * ((i <= decayIters/5) + .8 * (i > decayIters/5 & i <= decayIters/2) + .5 * (i > decayIters/2 & i <= decayIters*.8)+ .2 * (i > decayIters*.8));
+alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIters/2.5) + .125 * (i > decayIters/2.5 & i <= decayIters*.8)+ .025 * (i > decayIters*.8));
       
     % pick an x (data point) randomly
     x = dataInput(:,randi(size(dataInput,2)));
@@ -77,8 +89,22 @@ for i = 1:numIters
     % update the weights - Learning rule
     lattice = lattice + alpha * neighbourhoodFn .* differenceMatrix;
     
-    if sum(i == [numIters/10 numIters/2 numIters])
+    % Checking for convergence every 1000 steps
+    if mod(i,1000) == 0
+%         mapData = calcDataMapping(lattice,dataInput); 
+        [~, mapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
+        match = (mapData(1,:) == oldMapData(1,:) & mapData(2,:) == oldMapData(2,:));
+%         figure(3); hold on; plot(i,sum(match),'k.');
+        if sum(match)/size(dataInput,2) >= (1 - 1e-3) % < .1 percentage change in prototype assignment
+            stepsToConv = i;
+        else
+            oldMapData = mapData;
+        end
+    end
+    % making plots at particular learning steps as defined in the vector
+    if sum(i == [numIters/10 numIters/2 stepsToConv])
         % Plot the mapping and input data
+        figure(1)
         subplot(2,2,dum);
         plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
         plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
@@ -86,16 +112,23 @@ for i = 1:numIters
         legend('Input data vectors','Prototype vectors')
         dum = dum + 1;
     end
+    
+    if stepsToConv < numIters
+        break
+    end
+    
 end
 finalLattice = lattice;
 
 end
 
 
-function densityLattice = calcDensityLattice(lattice,dataInput,sizeOflatticeCell)
-
+function [densityLattice,mapData,histoData]  = calcDensityLattice(lattice,dataInput,sizeOflatticeCell)
+% calculates the prototype each data point is mapped to
 densityLattice = zeros(sizeOflatticeCell);
-
+mapData = zeros([2 size(dataInput,2)]);
+histoData = zeros([sizeOflatticeCell,4]);
+seq = [ones(1,1000) 2*ones(1,1000) 3*ones(1,1000) 4*ones(1,1000)];
 for i = 1:size(dataInput,2)
     x = dataInput(:,i);
     
@@ -108,6 +141,9 @@ for i = 1:size(dataInput,2)
     c = [win_row win_col];
     % update the density lattice
     densityLattice(c(1),c(2)) = densityLattice(c(1),c(2)) + 1;
+    mapData(:,i) = [win_row win_col];
+    histoWrite = ([1 0 0 0] * (i <= 1000) + [0 1 0 0] * (i > 1000 & i <= 2000) + [0 0 1 0] * (i > 2000 & i <= 3000) + [0 0 0 1] * (i > 3000 & i <= 4000));
+    histoData(c(1),c(2),:) = histoData(c(1),c(2),:) + (reshape(histoWrite,1,1,[]));
 end
     
 end
@@ -130,6 +166,8 @@ end
 
 
 function x1 = createGaussians(dim,var,mean)
+% creates a normal random vector with dim dimension. mean of first 2
+% dimensions set by [mean1 mean2]
 x1 = sqrt(var)*randn(dim(1),dim(2));
 % x1=detrend(x1);
 x1(1,:) = x1(1,:) + mean(1);
@@ -137,31 +175,56 @@ x1(2,:) = x1(2,:) + mean(2);
 end
 
 
-% % Extraas : Cell function formulations..
-%     % find euclidian distances
-%     differenceMatrix = cellfun(@(t) t - x, lattice);
-%     distToXMatrix = cellfun(@(t) norm(t - x), lattice);
-% 
-% distNeighbour = @(w,c) sum(abs(w - c)); % Manhattan distance metric for the neighbourhood function
-% %     distNeighbour = @(w,c) norm(w,c); % eucleidian distance metric for the neighbourhood function
-% neighbourhoodFn = @(w,c) exp(-((distNeighbour(w,c))/(2*radius))^2);
-% 
-% Initializations
-%     differenceMatrix = zeros(size(lattice)); % a 3D matrix
-%     distToXMatrix =  zeros(size(latticeCell)); % a 2D matrix of eucledian distances
-%     
-% long for loop for calculation of eucliean distances         
-%     for k = 1:size(lattice,2)
-%         for j = 1:size(lattice,1)
-% %             differenceMatrix(j,k,:) = x - reshape(lattice(j,k,:),size(x));
-%             distToXMatrix(j,k) = norm(reshape(differenceMatrix(j,k,:),size(x)));
+function plotHistoChart(histoData)
+figure;
+m = size(histoData,1); n = size(histoData,2);
+p = 1;
+for j = 1:n
+    for i = 1:m
+        a = subplot(m,n,p);
+%         a = axes('parent', h);
+        hold(a, 'on')
+        
+        hiss = reshape(histoData(i,j,:),1,4,[]);
+        %         bar(hiss);
+        colors = {'r', 'b', 'g', 'y'};
+        for k = 1:numel(hiss)
+            b = bar(k, hiss(k),colors{k});
+        end
+        p = p + 1;
+
+%         
+%         colors = {'r', 'b', 'g', 'y'};
+%         somenames = {'IND Relation'; 'DIS Relation'; 'EQ Relation'};
+%         
+%         for k = 1:numel(hiss)
+%             b = bar(k, x(k), 0.1, 'stacked', 'parent', a, 'facecolor', colors{i});
 %         end
-%     end
+%         
+%         a.XTick = 1:3;
+%         a.XTickLabel = somenames;
+%         
+%         ylabel('F1')
+    end
+end
+end
 % 
-% long for loop for finding distance and making neighbourhood functions
-% for j = 1:size(lattice,2)
-%     for i = 1:size(lattice,1)
-%         w = [i j];
-% %         distNeighbour = sum(abs(w - c)); % Manhattan distance metric for the neighbourhood function
-%         %     distNeighbour = norm(w,c); % eucleidian distance metric for the neighbourhood function
-%         neighbourhoodFn(i,j,:) = exp(-((distNeighbour)/(radius))^2);
+% 
+% function mapData = calcDataMapping(lattice,dataInput)
+% % outputs a vector showing the prototype location where each data point maps 
+% mapData = zeros([2 size(dataInput,2)]);
+% 
+% for i = 1:size(dataInput,2)
+%     x = dataInput(:,i);
+%     
+%     % find euclidian distances and difference between chosen x and all W's
+%     differenceMatrix = reshape(x,1,1,[]) - lattice; % a 3D matrix
+%     distToXMatrix = sqrt(sum((differenceMatrix).^2,3)); % a 2D matrix for euclidian distances to x
+%     
+%     % find the winner = c = [win_row win_col]
+%     [~, winner] = min(distToXMatrix(:)); [win_row, win_col] = ind2sub(size(distToXMatrix), winner); 
+%     % update the density lattice
+%     mapData(:,i) = [win_row win_col];
+% end
+%     
+% end
