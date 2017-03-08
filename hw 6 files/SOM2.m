@@ -58,7 +58,7 @@ xlabel('First data dimension'); ylabel('Second data dimension'); title('Plot of 
 legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
 
 dum = 2;
-[~, oldMapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
+% [~, oldMapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
 stepsToConv = numIters;
 
 for i = 1:numIters
@@ -85,17 +85,17 @@ alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIte
     lattice = lattice + alpha * neighbourhoodFn .* differenceMatrix;
     
     % Checking for convergence every 1000 steps
-    if mod(i,1000) == 0
-%         mapData = calcDataMapping(lattice,dataInput); 
-        [~, mapData, ~] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
-        match = (mapData(1,:) == oldMapData(1,:) & mapData(2,:) == oldMapData(2,:));
-%         figure(3); hold on; plot(i,sum(match),'k.');
-        if sum(match)/size(dataInput,2) >= (1 - 1e-3) % < .1 percentage change in prototype assignment
-            stepsToConv = i;
-        else
-            oldMapData = mapData;
-        end
-    end
+%     if mod(i,1000) == 0
+% %         mapData = calcDataMapping(lattice,dataInput); 
+%         [~, mapData, histoData] = calcDensityLattice(lattice,dataInput,size(latticeCell)); % table of the prototype where each data point maps
+%         match = (mapData(1,:) == oldMapData(1,:) & mapData(2,:) == oldMapData(2,:));
+% %         figure(3); hold on; plot(i,sum(match),'k.');
+%         if sum(match)/size(dataInput,2) >= (1 - 1e-3) % < .1 percentage change in prototype assignment
+%             stepsToConv = i;
+%         else
+%             oldMapData = mapData;
+%         end
+%     end
     % making plots at particular learning steps as defined in the vector
     if sum(i == [decayIters/10 decayIters/2 decayIters])
         % Plot the mapping and input data
@@ -107,21 +107,21 @@ alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIte
         legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
         dum = dum + 1;
     end
-    % making plots every 1000 learning steps to visually approximate
-    % learning steps to convergence
-        if ~mod(i,1000)
-%         Plot the mapping and input data
-        figure(2)
-%         subplot(2,2,dum);
-        dI = reshape(dataInput',[],4,2);
-        plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
-        plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
-        xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
-        legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
-        hold off; 
-        drawnow; 
-%         dum = dum + 1;
-        end
+%     % making plots every 1000 learning steps to visually approximate
+%     % learning steps to convergence
+%         if ~mod(i,1000)
+% %         Plot the mapping and input data
+%         figure(2)
+% %         subplot(2,2,dum);
+%         dI = reshape(dataInput',[],4,2);
+%         plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
+%         plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
+%         xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
+%         legend('Input data1','Input data2','Input data3','Input data4','Prototype vectors')
+%         hold off; 
+%         drawnow; 
+% %         dum = dum + 1;
+%         end
     
     if stepsToConv < numIters
         break
@@ -208,7 +208,9 @@ for j = 1:n
     end
 end
 end
-% 
+
+
+%
 %
 % % Plot the mapping and input data
 % figure;
