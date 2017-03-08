@@ -2,14 +2,14 @@
 function SOM2
 % Prashant Kalvapalle 
 % Comp 504 HW6 - Base code for all problems
-
+% close 1;  
 % NOTE : Initial (and final) lattice is a cell representation, In the function it is
 % used as a multi-dimensional matrix
 
 latticeSize = [8 8]; 
 initRadius = max(latticeSize); % Initial radius of influence
 
-numIters = 50000; % number of learning steps
+numIters = 20000; % number of learning steps
 alphaI = .8; % learning rate
 
 % Input data entry
@@ -24,15 +24,9 @@ latticeCell = createInitLattice(dimDataInput,latticeSize); % weights initializat
 % % giving the final weights of the lattice in Cell form
 % finalLatticeCell = mat2cell(finalLattice,ones(1,latticeSize(1)),ones(1,latticeSize(2)),2); finalLatticeCell = cellfun(@(x)reshape(x,2,1),finalLatticeCell,'un',0);
 
-% % Plot the mapping and input data
-% figure;
-% plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(finalLattice(:,:,1),finalLattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
-% plot(finalLattice(:,:,1),finalLattice(:,:,2),'k-'); plot(finalLattice(:,:,1)',finalLattice(:,:,2)','b-');
-% xlabel('First data dimension'); ylabel('Second data dimension'); title('Self organised clusters')
-
 [densityLattice, ~, histoData] = calcDensityLattice(finalLattice,dataInput,size(latticeCell));
 densityLattice = mat2gray(densityLattice);
-figure; imagesc(densityLattice); colormap(flipud(gray)); colorbar
+figure; imagesc(densityLattice); colormap(flipud(gray)); colorbar; title('Density of Inputs mapped to each Prototype')
 
 if stepsToConv < numIters
     disp(['SOM Converged in ',num2str(stepsToConv),' steps'])
@@ -57,7 +51,8 @@ latticeIndices(:,:,1) = r(:,ones(1,size(lattice,2))); latticeIndices(:,:,2) = c(
 
 figure(1);
 subplot(2,2,1);
-plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
+dI = reshape(dataInput',[],4,2);
+plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
 plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
 xlabel('First data dimension'); ylabel('Second data dimension'); title('Plot of prototypes in input space : Initial')
 legend('Input data vectors','Prototype vectors')
@@ -102,16 +97,31 @@ alpha = alphaI * ((i <= decayIters/10) + .5 * (i > decayIters/10 & i <= decayIte
         end
     end
     % making plots at particular learning steps as defined in the vector
-    if sum(i == [numIters/10 numIters/2 stepsToConv])
+    if sum(i == [decayIters/10 decayIters/2 decayIters])
         % Plot the mapping and input data
-        figure(1)
-        subplot(2,2,dum);
-        plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
+        figure(1); subplot(2,2,dum);
+        dI = reshape(dataInput',[],4,2);
+        plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
         plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
         xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
         legend('Input data vectors','Prototype vectors')
         dum = dum + 1;
     end
+    % making plots every 1000 learning steps to visually approximate
+    % learning steps to convergence
+        if ~mod(i,1000)
+%         Plot the mapping and input data
+        figure(2)
+%         subplot(2,2,dum);
+        dI = reshape(dataInput',[],4,2);
+        plot(dI(:,:,1),dI(:,:,2),'.'); hold on; plot(lattice(:,:,1),lattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
+        plot(lattice(:,:,1),lattice(:,:,2),'b-'); plot(lattice(:,:,1)',lattice(:,:,2)','b-');
+        xlabel('First data dimension'); ylabel('Second data dimension'); title(['Plot of prototypes in input space at ',num2str(i),' Learning Steps'])
+        legend('Input data vectors','Prototype vectors')
+        hold off; 
+        drawnow; 
+%         dum = dum + 1;
+        end
     
     if stepsToConv < numIters
         break
@@ -128,7 +138,7 @@ function [densityLattice,mapData,histoData]  = calcDensityLattice(lattice,dataIn
 densityLattice = zeros(sizeOflatticeCell);
 mapData = zeros([2 size(dataInput,2)]);
 histoData = zeros([sizeOflatticeCell,4]);
-seq = [ones(1,1000) 2*ones(1,1000) 3*ones(1,1000) 4*ones(1,1000)];
+% seq = [ones(1,1000) 2*ones(1,1000) 3*ones(1,1000) 4*ones(1,1000)];
 for i = 1:size(dataInput,2)
     x = dataInput(:,i);
     
@@ -181,35 +191,32 @@ m = size(histoData,1); n = size(histoData,2);
 p = 1;
 for j = 1:n
     for i = 1:m
-        a = subplot(m,n,p);
-%         a = axes('parent', h);
-        hold(a, 'on')
-        
+        ax = axes('position',[(i-1)/m (n-j)/n 1/m 1/n]); hold on;
         hiss = reshape(histoData(i,j,:),1,4,[]);
-        %         bar(hiss);
         colors = {'r', 'b', 'g', 'y'};
+        % Plots different bars for each data type
         for k = 1:numel(hiss)
-            b = bar(k, hiss(k),colors{k});
+            bar(ax,k, hiss(k),colors{k});
         end
+        ylim([0 200]);
+        set(ax,'YTickLabel',[]);set(ax,'XTickLabel',[]);
+        set(ax,'Box','on')
+%         set(gca,'Visible','off');
+%         set(gca,'position',[i/m (n-j)/n 1/m 1/n])
         p = p + 1;
 
-%         
-%         colors = {'r', 'b', 'g', 'y'};
-%         somenames = {'IND Relation'; 'DIS Relation'; 'EQ Relation'};
-%         
-%         for k = 1:numel(hiss)
-%             b = bar(k, x(k), 0.1, 'stacked', 'parent', a, 'facecolor', colors{i});
-%         end
-%         
-%         a.XTick = 1:3;
-%         a.XTickLabel = somenames;
-%         
-%         ylabel('F1')
     end
 end
 end
 % 
+%
+% % Plot the mapping and input data
+% figure;
+% plot(dataInput(1,:),dataInput(2,:),'g.'); hold on; plot(finalLattice(:,:,1),finalLattice(:,:,2),'ko','MarkerFaceColor','k','MarkerSize',4);
+% plot(finalLattice(:,:,1),finalLattice(:,:,2),'k-'); plot(finalLattice(:,:,1)',finalLattice(:,:,2)','b-');
+% xlabel('First data dimension'); ylabel('Second data dimension'); title('Self organised clusters')
 % 
+% Old function - built into the calcDensityLattice function
 % function mapData = calcDataMapping(lattice,dataInput)
 % % outputs a vector showing the prototype location where each data point maps 
 % mapData = zeros([2 size(dataInput,2)]);
@@ -228,3 +235,32 @@ end
 % end
 %     
 % end
+%           Extra commands in the bar plot
+%         a = subplot(m,n,p);
+%         a = axes('parent', h);
+%         hold(a, 'on')
+%         
+%         colors = {'r', 'b', 'g', 'y'};
+%         somenames = {'IND Relation'; 'DIS Relation'; 'EQ Relation'};
+%         
+%         for k = 1:numel(hiss)
+%             b = bar(k, x(k), 0.1, 'stacked', 'parent', a, 'facecolor', colors{i});
+%         end
+%         
+%         a.XTick = 1:3;
+%         a.XTickLabel = somenames;
+%         
+%         ylabel('F1')
+% ------------------
+%         subplot(m,n,p); hold on;
+%         hiss = reshape(histoData(i,j,:),1,4,[]);
+%         colors = {'r', 'b', 'g', 'y'};
+%         % Plots different bars for each data type
+%         for k = 1:numel(hiss)
+%             bar(k, hiss(k),colors{k});
+%         end
+%         ylim([0 200]);
+%         set(ax2,'YTickLabel',[]);
+%         set(gca,'Visible','off');
+% %         set(gca,'position',[i/m (n-j)/n 1/m 1/n])
+%         p = p + 1;
