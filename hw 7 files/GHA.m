@@ -1,17 +1,17 @@
 % hw7 Problem 2.2
-function [trainEigenVec] = GHA
+function [trainEigenVec,storedValues,eigenCheck] = GHA
 % Prashant Kalvapalle 
 % Comp 504 HW6 - Base code for all problems
 
-numIters = 50000;
-alpha = 1e-3;
+numIters = 1000000;
+alpha = 1e-4;
 numOutputPE = 4; %  = number of eigen vectors needed?
 
 % Input data entry
 trainDataFilename = 'iris-train copy.txt';
 testDataFilename = 'iris-test copy.txt';
 
-[trainInput,trainOutput] = loadData(trainDataFilename); % trainInput = 75 x 4
+[trainInput,~] = loadData(trainDataFilename); % trainInput = 75 x 4
 % [testInput,testOutput] = loadData(testDataFilename);
 % dataInput = [trainInput ; testInput]';
 % dataClasses = [trainOutput ; testOutput];
@@ -20,13 +20,14 @@ testDataFilename = 'iris-test copy.txt';
 trainInput = trainInput - mean(trainInput);
 
 % finding eigen vectors without ANN
-eigenCheck = pca(trainInput);
+eigenCheck = pca(trainInput)'
 
 initWeightMatrix = rand(numOutputPE,size(trainInput,2));  % create the weight matrices for each hidden layer and output layer
 
 % calling sanger's generalized heabbian algo
 [trainEigenVec,storedValues] = sangGHA(trainInput,alpha,numIters,initWeightMatrix);
-trainEigenVec * trainEigenVec'
+% trainEigenVec * trainEigenVec'
+trainEigenVec
 figure; plot(0:500:numIters,storedValues)
 end
 
@@ -35,27 +36,33 @@ function [trainEigenVec,storedValues] = sangGHA(trainInput,alpha,numIters,initWe
 % trainInput = 75 x 4
 weightMatrix = initWeightMatrix; % initialization - dimension 1 x 4
 
+n = size(weightMatrix,1); m = n;
+rowM = repmat((1:m)',1,n); colM = repmat(1:n,m,1); ut = colM > rowM; % An upper triangular logical matrix 
+
 % to store the P * P' which is expected to be I
-storedValues = zeros(numIters/500,size(weightMatrix,2)); %storedValues(1,:) = weightMatrix(1,:); dum = 2;
-checkI = weightMatrix * weightMatrix' ;%- eye(size(weightMatrix,1));
-storedValues(1,:) = diag(checkI); dum = 2;
+storedValues = zeros(numIters/500,size(weightMatrix,2)); storedValues(1,:) = weightMatrix(1,:); dum = 2;
+% checkI = weightMatrix * weightMatrix' ;%- eye(size(weightMatrix,1));
+% storedValues(1,:) = diag(checkI); dum = 2;
         
 for i = 1:numIters
     x = trainInput(randi(size(trainInput,1)),:)'; % pick a random pattern - vector of 4 x 1
     y = weightMatrix * x;
     crossCorrel = y * y';
-    lowerTriangular = makeLowerTriangular(crossCorrel);
+    lowerTriangular = makeLowerTriangular(crossCorrel,ut);
     
-    % weight update step
+    % weight update step : GHA learning rule
     weightMatrix = weightMatrix + alpha*(y*x' - lowerTriangular * weightMatrix);
     
     % to make learning history
    
     if ~mod(i,500)
-        checkI = weightMatrix * weightMatrix' ;%- eye(size(weightMatrix,1)); 
-        storedValues(dum,:) = diag(checkI); dum = dum + 1;
-%         storedValues(dum,:) = weightMatrix(1,:); dum = dum + 1;  % this thing is only for 1 output PE
+%         checkI = weightMatrix * weightMatrix' ;%- eye(size(weightMatrix,1)); 
+%         storedValues(dum,:) = diag(checkI); dum = dum + 1;
+        storedValues(dum,:) = weightMatrix(1,:); dum = dum + 1;  % this thing is only for 1 output PE
     end
+%      if ~mod(i,5000)
+%         checkI = weightMatrix * weightMatrix'  
+%      end
 
 end
 
@@ -63,12 +70,10 @@ trainEigenVec = weightMatrix;
 end
 
 
-function lowerTriangular = makeLowerTriangular(crossCorrel)
+function lowerTriangular = makeLowerTriangular(crossCorrel,ut)
 % to make the correlation matrix lower triangular
-[m,n] = size(crossCorrel);
-rowM = repmat((1:m)',1,n); colM = repmat(1:n,m,1);
 lowerTriangular = crossCorrel;
-lowerTriangular(colM > rowM) = 0;
+lowerTriangular(ut) = 0;
    
 end
 
