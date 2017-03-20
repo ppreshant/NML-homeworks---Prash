@@ -27,7 +27,7 @@ nP = 60;          % Number of LVQ prototypes (weight vectors)
 nC = 3;           % Number of classes
 %mu = 0.05;       % Learning rate -- NOT taken from here. Set in the decay
 % schedule below
-maxsteps = 60000; % Max. number of learning steps allowed. Increase this as needed.
+maxsteps = 100000; % Max. number of learning steps allowed. Increase this as needed.
 %mfr = 2000;      % Monitoring frequency --- NOT taken from here. Set in
 % the decay schedule below
 % Decay schedule for learning rate mu, in the form as shown
@@ -41,10 +41,10 @@ Mfrsched = [200 500 5000 20000
 [lr1,lr2] = size(LRsched);  % Get the size of the decay step function
 [mf1,mf2] = size(Mfrsched); % Get the sze of the monitoring function
 
-disp 'N, np, nC, mu, maxsteps'
-N
-nP
-nC
+% disp 'N, np, nC, mu, maxsteps'
+% N
+% nP
+% nC
 maxsteps
 
 % Generate the training data:
@@ -119,10 +119,20 @@ end
 [W,Cw,lstep,errorHistory] = LVQ1_learn(A,X,Cw,Cx,ndim,N,nP,label_color_map,LRsched,Mfrsched,lr2,mf2,maxsteps);
 
 % LVQ1 recall function
-predicted_classes = recall(X,W,Cw,N,nP,label_color_map,nrows,ncols,lstep);
+[predicted_classes,errorCount] = recall(X,W,Cw,N,nP,label_color_map,nrows,ncols,lstep,Cx);
+
+disp(strcat('Training data : error rate = ',num2str(errorCount),'/81'))
 
 % Insert here generation of test data
+[Atest,X_test,Cx_test,N_test,nrows_test,ncols_test] = generateTestData(A);
 
+% target classification for test data
+figure, imagesc(Atest), colormap(label_color_map([1 5 7],:)); % use colors for classes
+title('Test Data : Target classification')
+
+% Recall on test data
+[predicted_classes_test,test_errorCount] = testRecall(X_test,W,Cw,N_test,nP,label_color_map,nrows_test,ncols_test,Cx_test);
+disp(strcat('Test data : error rate = ',num2str(test_errorCount),'/324'))
 % plotting learning history
 figure; plot(errorHistory(2,:),errorHistory(1,:)); xlabel('Learning steps'); ylabel('Number of misclassifications'); 
 title('Learning History')
@@ -145,17 +155,17 @@ data_max=max(max(X));
 scale=1; % Make this a parameter if you like
 W=scale*(rand(ndim,nP)*(data_max - data_min)+data_min);
 %
-% Plot initial state of prototypes on target data
-%     figure, imagesc(A), colormap('gray'); hold on
-figure, imagesc(A), colormap(label_color_map([1 5 7],:)); hold on
-plot(W(1,Cw==1),W(2,Cw==1),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(1,:),'MarkerSize',10)
-plot(W(1,Cw==2),W(2,Cw==2),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(5,:),'MarkerSize',10)
-plot(W(1,Cw==3),W(2,Cw==3),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(7,:),'MarkerSize',10)
-% plot(W(1,:),W(2,:),'o','Color', label_color_map(Cw(:),(:))
-% plot(W(1,:),W(2,:),'o','Color', label_color_map(Cw(:),(:))
-title('Target classes and prototype positions, learn step = 0');
-curFrame = 1;
-F(curFrame) = getframe(gcf); curFrame=curFrame+1;
+% % Plot initial state of prototypes on target data
+% %     figure, imagesc(A), colormap('gray'); hold on
+% figure, imagesc(A), colormap(label_color_map([1 5 7],:)); hold on
+% plot(W(1,Cw==1),W(2,Cw==1),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(1,:),'MarkerSize',10)
+% plot(W(1,Cw==2),W(2,Cw==2),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(5,:),'MarkerSize',10)
+% plot(W(1,Cw==3),W(2,Cw==3),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(7,:),'MarkerSize',10)
+% % plot(W(1,:),W(2,:),'o','Color', label_color_map(Cw(:),(:))
+% % plot(W(1,:),W(2,:),'o','Color', label_color_map(Cw(:),(:))
+% title('Target classes and prototype positions, learn step = 0');
+% curFrame = 1;
+% F(curFrame) = getframe(gcf); curFrame=curFrame+1;
 %%
 
 mu = LRsched(1,1); % initial value of the learning rate
@@ -182,7 +192,7 @@ for lstep = 1:maxsteps
     end
     %
     if lstep == maxsteps
-        lstep, mu, mfr
+        lstep%, mu, mfr
         % plotting of prototypes in data space if ndim <3
         if ndim < 3
             %      figure, imagesc(A), colormap('gray'); hold on
@@ -191,7 +201,7 @@ for lstep = 1:maxsteps
             plot(W(1,Cw==2),W(2,Cw==2),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(5,:),'MarkerSize',10)
             plot(W(1,Cw==3),W(2,Cw==3),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(7,:),'MarkerSize',10)
             title(strcat('Target classes and prototype positions, learn step = ',num2str(lstep)));
-            F(curFrame) = getframe(gcf); curFrame=curFrame+1;
+%             F(curFrame) = getframe(gcf); curFrame=curFrame+1;
         end      
         
         % Check for stopping conditions.
@@ -228,7 +238,7 @@ end
 end
 
 
-function predicted_classes = recall(X,W,Cw,N,nP,label_color_map,nrows,ncols,lstep)
+function [predicted_classes,errorCount] = recall(X,W,Cw,N,nP,label_color_map,nrows,ncols,lstep,Cx)
 %%
 % Test the classification of the training data using the prototypes
 % (weights, W) learned
@@ -238,7 +248,7 @@ for i = 1:N
     for j = 1:nP
         d(j) = norm(W(:,j)-X(:,i));
     end
-    [mindist,I] = min(d);
+    [~,I] = min(d);
     Cxhat(i) = Cw(I);
 end
 %
@@ -263,7 +273,49 @@ title(strcat('Predicted classes for training data, and prototype positions, lear
 %
 % Insert display of predicted classes for test data, and superimpose the LVQ prototypes
 
+errorCount = sum(Cxhat ~= Cx);
 end
+
+
+function [predicted_classes,errorCount] = testRecall(X,W,Cw,N,nP,label_color_map,nrows,ncols,Cx)
+%%
+% Test the classification of the training data using the prototypes
+% (weights, W) learned
+Cxhat = zeros(1,N);
+for i = 1:N
+    d = zeros(1,nP);
+    for j = 1:nP
+        d(j) = norm(W(:,j)-X(:,i));
+    end
+    [~,I] = min(d);
+    Cxhat(i) = Cw(I);
+end
+%
+% Insert here recall for test data (or make the above recall into a function and
+% call it with training and with test data)
+
+% Reshape to original spatial image format, and display
+Cxhat_reshaped = reshape(Cxhat,nrows,ncols);
+% predicted_classes = flipud(Cxhat_reshaped);
+predicted_classes = Cxhat_reshaped;
+%    disp 'End';
+%    imagesc(Cxhat_reshaped); colormap('gray');
+%
+ W = 2 * W;
+% Display predicted classes for training data, and superimpose the LVQ prototypes
+figure, imagesc(predicted_classes), colormap(label_color_map([1 5 7],:)); hold on
+plot(W(1,Cw==1),W(2,Cw==1),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(1,:),'MarkerSize',10)
+plot(W(1,Cw==2),W(2,Cw==2),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(5,:),'MarkerSize',10)
+plot(W(1,Cw==3),W(2,Cw==3),'o','LineWidth',2.0,'MarkerEdgeColor','k','MarkerFaceColor', label_color_map(7,:),'MarkerSize',10)
+title(strcat('Predicted classes for testing data, and prototypes'));
+%      F(curFrame) = getframe(gcf); curFrame=curFrame+1;
+%       end
+%
+% Insert display of predicted classes for test data, and superimpose the LVQ prototypes
+errorCount = sum(Cxhat ~= Cx);
+
+end
+
 
 function errorCount = errorRecall(X,W,Cw,Cx,N,nP)
 Cxhat = zeros(1,N);
@@ -278,6 +330,34 @@ end
 
 errorCount = sum(Cxhat ~= Cx);
 end
+
+
+function [Atest,X,Cx,N,nrows,ncols] = generateTestData(A)
+Atest = zeros(18,18);
+Atest(1:2:17,1:2:17) = A; Atest(2:2:18,1:2:17) = A; Atest(1:2:17,2:2:18) = A; Atest(2:2:18,2:2:18) = A;
+
+N = numel(Atest); nrows = size(Atest,1); ncols = size(Atest,2); ndim = 2; % Set the dimensions of the input image
+
+X = zeros(ndim,N);
+Cx = zeros(1,N);
+k = 0;
+
+for i = 1:nrows
+    for j = 1:ncols
+        k = k+1;
+        %       X(1,k) = i-ceil(nrows/2); % to center the y coordinates if desired
+        %      	X(2,k) = j-ceil(ncols/2); % to center the x coordinates if desired
+        X(1,k) = i/2; % since it is a fine grained grid, the step size is 1/2
+        X(2,k) = j/2;
+        %      	Cx(k) = A(ncols-j+1, i); % this seems to flip
+        % then requires a flipud at the end
+        Cx(k) = Atest(j,i);
+    end
+end
+
+end
+
+
 function makeMovie(F)
 %%
 % Save figures in a movie
