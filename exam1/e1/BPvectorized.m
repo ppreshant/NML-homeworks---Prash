@@ -24,10 +24,10 @@ A = 1; B = .2;
 %% Input and Output samples for TRAINING the BP network
 load ocelot;
 
-maxTrainScale = 1; % not relevant in this code
+maxTrainScale = 1; % not relevant in this code - since image is being scaled 
 ocelotSc = ocelot ./ max(max(ocelot));  % scaling the input image pixels to lie between [0,1]
 
-trainInput = loadVectors(ocelotSc);
+trainInput = loadVectors(ocelotSc); % each row is a pattern; size 768 x 64
 trainOutput = trainInput; % output is same as input
 
 %% Input and Output samples for TESTING the BP network
@@ -36,14 +36,16 @@ load fruitstill;
 maxTestScale = 1;
 fruitstillSc = fruitstill ./ max(max(fruitstill));   % scaling the input image pixels to lie between [0,1]
 
-testOutput = loadVectors(fruitstillSc);
-testInput = testOutput; % output is same as input
+testInput = loadVectors(fruitstillSc);
+testOutput = testInput; % output is same as input
+
+outDim = size(trainOutput);
 
 %% calling the BPtraining algorithm
-[weightMatrices,otherVariables] = BPLearn(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points);
+[weightMatrices,otherVariables] = BPLearn(trainInput, trainOutput,  testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points);
 
-actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
-actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
+actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTestScale;
+actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTrainScale; % re-scaled
 % actualTrainOutput = sort(actualTrainOutput,'descend');
 % disp(sort(actualTrainOutput,'descend'))
 
@@ -57,7 +59,7 @@ else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
 
-disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
+disp(['RMS error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput))])
 
 %% reconstructing the image from the actual output from recall step
 
@@ -113,7 +115,6 @@ end
 
 
 function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points)
-
 % The actual Neural Network in this function
 
 %  For 3 layers (layer 1,2,3 - layer 1 is input)
@@ -121,17 +122,21 @@ function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, tes
 % weights go 1,2  
 % delta go 1 to 2
 
+% NOTE: trainInput is a cell
+
+%%
 % Error initialization and other variables
 total_steps = maxLearnSteps * batchSize;
 otherVariables = cell(3,1); % for storing total_steps, Erms_store_train, Erms_store_test
 eval_interval = maxLearnSteps / eval_points;
 Erms_train = zeros(2,eval_points); Erms_test = Erms_train; % stores the RMS error every m iterations (m = eval_interval)
+outDim = size(trainOutput);
 % initial error
 dum = 1; % dummy index for storing RMS errors at frequent intervals while training
-frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices);
-frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices);
-Erms_train(1,dum) = computeRMSE(trainOutput,frozenTrainOutput); Erms_train(2,dum) = 0;  % store errors and learning steps
-Erms_test(1,dum) = computeRMSE(testOutput,frozenTestOutput); Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
+frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
+frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
+Erms_train(1,dum) = computeErrorMeasure(trainOutput,frozenTrainOutput); Erms_train(2,dum) = 0;  % store errors and learning steps
+Erms_test(1,dum) = computeErrorMeasure(testOutput,frozenTestOutput); Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
 
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
@@ -139,7 +144,7 @@ if batchSize > length(trainInput)
 end
 
 oldWeightDeltas = createWeightDeltas(numNodes);
-% big loop
+%% big loop
 for i = 1:maxLearnSteps % big loop
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
@@ -157,18 +162,18 @@ for i = 1:maxLearnSteps % big loop
         layerOutputs = cell(1,length(numNodes));
         nodeDeltas = createNodeValues(numNodes);
         
-        pattern = batchInput(k,:);
-        desiredOutput = batchOutput(k,:);  % this is randomized don't use for testing
+        pattern = batchInput(k,:)'; % (64 x 1) =  column vector
+        desiredOutput = batchOutput(k,:)';  % this is randomized don't use for testing % desired Output is a column vector (number x 1)
         
         % forward propagation
         layerOutputs{1} = pattern;
         layerOutputs{1}(end+1) = 1;  % fixing bias = 1
         
         for l = 1:length(numNodes)-2
-            layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')';
+            layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l});
             layerOutputs{l+1}(end) = 1; % fixing bias nodes = 1 before calculating next layer's output
         end
-        l = l + 1; layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}')'; % for last layer since there is no bias
+        l = l + 1; layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l}); % for last layer since there is no bias
         
         % backward propagation
         m = length(numNodes);
@@ -181,7 +186,7 @@ for i = 1:maxLearnSteps % big loop
 
             % vectorizing the delta updates
             nodeDeltas{m-1} = computeTheNodeDeltas(nodeDeltas, tanhSlope, m-1, layerOutputs, weightMatrices);
-            weightDeltas{m-1} = weightDeltas{m-1} + (learningRate * nodeDeltas{m-1} * previousLayerOutput);
+            weightDeltas{m-1} = weightDeltas{m-1} + (learningRate * nodeDeltas{m-1} * previousLayerOutput');
         end
     end                             % end of the batch
     %         disp(weightMatrices{1})
@@ -192,10 +197,10 @@ for i = 1:maxLearnSteps % big loop
     
     if mod(i,eval_interval) == 0
         dum = i/eval_interval + 1;
-        frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices);
-        frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices);
-        RMSE_train = computeRMSE(trainOutput,frozenTrainOutput);
-        RMSE_test = computeRMSE(testOutput,frozenTestOutput);
+        frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
+        frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
+        RMSE_train = computeErrorMeasure(trainOutput,frozenTrainOutput);
+        RMSE_test = computeErrorMeasure(testOutput,frozenTestOutput);
         Erms_train(1,dum) = RMSE_train; Erms_train(2,dum) = i*k;  % store errors and learning steps
         Erms_test(1,dum) = RMSE_test; Erms_test(2,dum) = i*k; % store errors and learning steps
         
@@ -229,9 +234,9 @@ hiddenNodeDeltas = diag(derivative) * nextLayerWeightVectorTranspose * nextLayer
 end
 
 
-function testOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices)
+function testOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim)
 % recall function
-testOutput = zeros(length(testInput),1); % creating a dummy output matrix - same dimension as inputs
+testOutput = zeros(outDim); % creating a dummy output matrix -to desired output dimensions
 
 for i = 1:length(testInput)
     output = [testInput(i,:),1]'; % a temp output variable for each input vector
@@ -241,7 +246,7 @@ for i = 1:length(testInput)
             output(end) = 1;
         end
     end
-    testOutput(i) = output; % stores the output vector for every input vector
+    testOutput(i,:) = output; % stores the output vector for every input vector
 end
 
 end
@@ -258,9 +263,12 @@ end
 end
 
 
-function RMSE = computeRMSE(desiredOutput, actualOutput)
+function RMSE = computeErrorMeasure(desiredOutput, actualOutput)
+% finding root mean square error per pattern
+% Input are matrices 768 x 64
 
-RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ length(desiredOutput));
+RMSE = norm((desiredOutput - actualOutput),'fro');
+% RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ size(desiredOutput,1));
 
 end
 
