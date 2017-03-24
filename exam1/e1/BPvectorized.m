@@ -1,5 +1,5 @@
 % “Exam01, Problem 1 (Compression)”
-function ProblemII
+function BPvectorized
 % Prashant Kalvapalle, Ragib Mostofa
 % COMP 502, Spring 2017, Homework Assignment IV Part II, Problem II
 % Vectorized BP
@@ -15,7 +15,7 @@ alpha = 0.9; % forgetting rate for momentum term >> Make it 0 for no momentum co
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxIterations = 5e5;  % number of times each batch is processed ; can terminate before if converged
+maxLearnSteps = 5e5;  % number of times each batch is processed ; can terminate before if converged
 errorTolerance = 0.018;  % scaled error tolerance (for inputs between [.1 - 1])
 
 N_training_pts = 100;  % number of training patterns selected between 0.1 and 1
@@ -23,24 +23,24 @@ A = 1; B = .2;
 
 %% Input and Output samples for TRAINING the BP network
 load ocelot;
-trainInput = loadVectors(ocelot);
 
-maxTrainScale = max(trainInput);
-scaledTrainOutput = trainInput ./ maxTrainScale;  % scaling the input image pixels to lie between [.1,1]
+maxTrainScale = 1; % not relevant in this code
+ocelotSc = ocelot ./ max(max(ocelot));  % scaling the input image pixels to lie between [0,1]
 
+trainInput = loadVectors(ocelotSc);
 trainOutput = trainInput; % output is same as input
 
 %% Input and Output samples for TESTING the BP network
 load fruitstill;
-testOutput = loadVectors(fruitstill);
 
-maxTestScale = max(testOutput);
-scaledTestOutput = testOutput ./ maxTestScale;  % scaling the output to lie between [.1,1]
+maxTestScale = 1;
+fruitstillSc = fruitstill ./ max(max(fruitstill));   % scaling the input image pixels to lie between [0,1]
 
+testOutput = loadVectors(fruitstillSc);
 testInput = testOutput; % output is same as input
 
 %% calling the BPtraining algorithm
-[weightMatrices,otherVariables] = BPLearn(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points);
+[weightMatrices,otherVariables] = BPLearn(trainInput, scaledTrainOutput,  testInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points);
 
 actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices) .* maxTestScale;
 actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices) .* maxTrainScale; % re-scaled
@@ -51,7 +51,7 @@ total_steps = otherVariables{1};
 Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
 Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
 
-if total_steps == maxIterations * batchSize
+if total_steps == maxLearnSteps * batchSize
     disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
 else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
@@ -59,18 +59,18 @@ end
 
 disp(['RMS error = ',num2str(computeRMSE(trainOutput,actualTrainOutput))])
 
+%% reconstructing the image from the actual output from recall step
+
+recalcTrain = reconstructImage(actualTrainOutput);
+recalcTest = reconstructImage(actualTestOutput);
+
 %% plot for Training accuracy
 figure;
 
-plot(nValues,actualTrainOutput,'--');
-hold on
-plot(nValues,trainOutput);
-
-grid on
-xlabel('n')
-ylabel('Signal')
-title('Comparison of actual training curve wrt desired output')
-legend('Learnt Function','Actual Function')
+subplot(2,2,1); imagesc(ocelotSc); colormap('gray'); title('Original Image')
+s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image')
+s3 = subplot(2,2,3); imagesc(recalcTrain - ocelot); colormap('gray'); title('Residual (difference) Image'); colorbar
+s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
 
 %% % plot for Testing accuracy
 % figure;
@@ -112,7 +112,7 @@ legend('Training Errors')%,'Testing Errors')
 end
 
 
-function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxIterations, errorTolerance, alpha, eval_points)
+function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points)
 
 % The actual Neural Network in this function
 
@@ -122,9 +122,9 @@ function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, tes
 % delta go 1 to 2
 
 % Error initialization and other variables
-total_steps = maxIterations * batchSize;
+total_steps = maxLearnSteps * batchSize;
 otherVariables = cell(3,1); % for storing total_steps, Erms_store_train, Erms_store_test
-eval_interval = maxIterations / eval_points;
+eval_interval = maxLearnSteps / eval_points;
 Erms_train = zeros(2,eval_points); Erms_test = Erms_train; % stores the RMS error every m iterations (m = eval_interval)
 % initial error
 dum = 1; % dummy index for storing RMS errors at frequent intervals while training
@@ -140,7 +140,7 @@ end
 
 oldWeightDeltas = createWeightDeltas(numNodes);
 % big loop
-for i = 1:maxIterations % big loop
+for i = 1:maxLearnSteps % big loop
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
     randomizedOutput = trainOutput(randomIndices,:);
@@ -231,17 +231,17 @@ end
 
 function testOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices)
 % recall function
-testOutput = zeros(length(testInput),1);
+testOutput = zeros(length(testInput),1); % creating a dummy output matrix - same dimension as inputs
 
 for i = 1:length(testInput)
-    output = [testInput(i,:),1]';
+    output = [testInput(i,:),1]'; % a temp output variable for each input vector
     for j = 1:length(numNodes) - 1
         output = hyperbolicTangentFunction(tanhSlope,weightMatrices{j} * output);
         if j ~= length(numNodes) - 1 % can remove 'if' and make the loop run till length - 2 and have the last output after the for
             output(end) = 1;
         end
     end
-    testOutput(i) = output;
+    testOutput(i) = output; % stores the output vector for every input vector
 end
 
 end
