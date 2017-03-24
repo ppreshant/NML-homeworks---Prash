@@ -15,8 +15,8 @@ alpha = 0.9; % forgetting rate for momentum term >> Make it 0 for no momentum co
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxLearnSteps = 5e5;  % number of times each batch is processed ; can terminate before if converged
-errorTolerance = 0.018;  % scaled error tolerance (for inputs between [.1 - 1])
+maxLearnSteps = 1e4;  % number of times each batch is processed ; can terminate before if converged
+errorTolerance = 0.1;  % scaled error tolerance (for inputs between [.1 - 1])
 
 N_training_pts = 100;  % number of training patterns selected between 0.1 and 1
 A = 1; B = .2;
@@ -71,7 +71,7 @@ figure;
 
 subplot(2,2,1); imagesc(ocelotSc); colormap('gray'); title('Original Image')
 s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image')
-s3 = subplot(2,2,3); imagesc(recalcTrain - ocelot); colormap('gray'); title('Residual (difference) Image'); colorbar
+s3 = subplot(2,2,3); imagesc(ocelot - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
 s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
 
 %% % plot for Testing accuracy
@@ -107,7 +107,7 @@ figure; plot(Erms_train(2,:),Erms_train(1,:)); %hold on;  plot(Erms_test(2,:),Er
 
 grid on
 xlabel('Learning Steps')
-ylabel('RMS error : All Unscaled train/test patterns')
+ylabel('MSSE error : with scaled data')
 title('Learning History')
 legend('Training Errors')%,'Testing Errors')
 
@@ -263,11 +263,11 @@ end
 end
 
 
-function RMSE = computeErrorMeasure(desiredOutput, actualOutput)
+function MSSE = computeErrorMeasure(desiredOutput, actualOutput)
 % finding root mean square error per pattern
 % Input are matrices 768 x 64
 
-RMSE = norm((desiredOutput - actualOutput),'fro');
+MSSE = norm((desiredOutput - actualOutput),'fro').^2;
 % RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ size(desiredOutput,1));
 
 end
