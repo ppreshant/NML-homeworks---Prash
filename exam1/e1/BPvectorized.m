@@ -8,44 +8,48 @@ batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
 eval_points = 100; % number of points in the learning history or error vs time graph
 
 numNodes = [64, 16, 64];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
-weightMatrices = createWeightMatrices(numNodes,[-.3,.3]);  % create the weight matrices for each hidden layer and output layer; [] = range of the weights
+weightMatrices = createWeightMatrices(numNodes,[-.1,.1]);  % create the weight matrices for each hidden layer and output layer; [] = range of the weights
 
-learningRate = 4e-1;
-alpha = 0.9; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
+learningRate = 3e-2;
+alpha = 0.7; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxLearnSteps = 1e4;  % number of times each batch is processed ; can terminate before if converged
-errorTolerance = 0.1;  % scaled error tolerance (for inputs between [.1 - 1])
-
-N_training_pts = 100;  % number of training patterns selected between 0.1 and 1
-A = 1; B = .2;
+maxLearnSteps = 5e4;  % number of times each batch is processed ; can terminate before if converged
+errorTolerance = 0.001;  % scaled error tolerance (for inputs between [.1 - 1])
 
 %% Input and Output samples for TRAINING the BP network
 load ocelot;
 
-maxTrainScale = 1; % not relevant in this code - since image is being scaled 
-ocelotSc = ocelot ./ max(max(ocelot));  % scaling the input image pixels to lie between [0,1]
+maxTrainScale = max(max(ocelot)); % not relevant in this code - since image is being scaled 
+% ocelotSc = ocelot ./ max(max(ocelot));  % scaling the input image pixels to lie between [0,1]
 
-trainInput = loadVectors(ocelotSc); % each row is a pattern; size 768 x 64
-trainOutput = trainInput; % output is same as input
+trainInput = loadVectors(ocelot); % each row is a pattern; size 768 x 64
+trainOutput = trainInput;
+
+scaledTrainInput = trainInput/maxTrainScale; % each row is a pattern; size 768 x 64
+scaledTrainOutput = scaledTrainInput; % output is same as input
 
 %% Input and Output samples for TESTING the BP network
 load fruitstill;
 
-maxTestScale = 1;
-fruitstillSc = fruitstill ./ max(max(fruitstill));   % scaling the input image pixels to lie between [0,1]
+maxTestScale =  max(max(fruitstill));
+% fruitstillSc = fruitstill ./ max(max(fruitstill));   % scaling the input image pixels to lie between [0,1]
 
-testInput = loadVectors(fruitstillSc);
-testOutput = testInput; % output is same as input
+testInput = loadVectors(fruitstill);
+testOutput = testInput;
+
+scaledTestInput = testInput/maxTestScale;
+scaledTestOutput = scaledTestInput; % output is same as input
 
 outDim = size(trainOutput);
 
 %% calling the BPtraining algorithm
-[weightMatrices,otherVariables] = BPLearn(trainInput, trainOutput,  testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points);
+[weightMatrices,otherVariables] = BPLearn(scaledTrainInput, scaledTrainOutput, scaledTestInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points,maxTrainScale,maxTestScale);
 
-actualTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTestScale;
-actualTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTrainScale; % re-scaled
+actualTrainOutput = BPrecall(scaledTrainInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTrainScale; % re-scaled
+actualTestOutput = BPrecall(scaledTestInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTestScale;
+
 % actualTrainOutput = sort(actualTrainOutput,'descend');
 % disp(sort(actualTrainOutput,'descend'))
 
@@ -59,20 +63,29 @@ else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
 
-disp(['RMS error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput))])
+disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput))])
 
 %% reconstructing the image from the actual output from recall step
 
 recalcTrain = reconstructImage(actualTrainOutput);
 recalcTest = reconstructImage(actualTestOutput);
 
+ocelotBackCalc = reconstructImage(trainInput) * maxTrainScale;
 %% plot for Training accuracy
 figure;
 
-subplot(2,2,1); imagesc(ocelotSc); colormap('gray'); title('Original Image')
+subplot(2,2,1); imagesc(ocelotBackCalc); colormap('gray'); title('Original Image')
 s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image')
 s3 = subplot(2,2,3); imagesc(ocelot - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
 s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
+
+%% plot for Training accuracy - unscaled plot
+figure;
+
+subplot(2,2,1); imagesc(ocelotBackCalc); colormap('gray'); title('Original Image'); colorbar
+s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image'); colorbar
+s3 = subplot(2,2,3); imagesc(ocelot - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
+% s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
 
 %% % plot for Testing accuracy
 % figure;
@@ -107,14 +120,14 @@ figure; plot(Erms_train(2,:),Erms_train(1,:)); %hold on;  plot(Erms_test(2,:),Er
 
 grid on
 xlabel('Learning Steps')
-ylabel('MSSE error : with scaled data')
+ylabel('Avg MSSE error : in original scale')
 title('Learning History')
 legend('Training Errors')%,'Testing Errors')
 
 end
 
 
-function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points)
+function [weightMatrices, otherVariables] = BPLearn(trainInput, trainOutput, testInput, testOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points,maxTrainScale,maxTestScale)
 % The actual Neural Network in this function
 
 %  For 3 layers (layer 1,2,3 - layer 1 is input)
@@ -135,8 +148,8 @@ outDim = size(trainOutput);
 dum = 1; % dummy index for storing RMS errors at frequent intervals while training
 frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
 frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
-Erms_train(1,dum) = computeErrorMeasure(trainOutput,frozenTrainOutput); Erms_train(2,dum) = 0;  % store errors and learning steps
-Erms_test(1,dum) = computeErrorMeasure(testOutput,frozenTestOutput); Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
+Erms_train(1,dum) = computeErrorMeasure(trainOutput,frozenTrainOutput)* maxTrainScale ; Erms_train(2,dum) = 0;  % store errors and learning steps
+Erms_test(1,dum) = computeErrorMeasure(testOutput,frozenTestOutput) * maxTestScale; Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
 
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
@@ -146,6 +159,9 @@ end
 oldWeightDeltas = createWeightDeltas(numNodes);
 %% big loop
 for i = 1:maxLearnSteps % big loop
+    
+%     numIters = 1e4;
+%     learningRate = learningRate * ((i <= numIters/10) + .5 * (i > numIters/10 & i <= numIters/2.5) + .125 * (i > numIters/2.5 & i <= numIters*.8)+ .025 * (i > numIters*.8));
     randomIndices = randperm(size(trainInput,1));
     randomizedInput = trainInput(randomIndices,:);
     randomizedOutput = trainOutput(randomIndices,:);
@@ -199,8 +215,8 @@ for i = 1:maxLearnSteps % big loop
         dum = i/eval_interval + 1;
         frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
         frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
-        RMSE_train = computeErrorMeasure(trainOutput,frozenTrainOutput);
-        RMSE_test = computeErrorMeasure(testOutput,frozenTestOutput);
+        RMSE_train = computeErrorMeasure(trainOutput,frozenTrainOutput)* maxTrainScale;
+        RMSE_test = computeErrorMeasure(testOutput,frozenTestOutput)* maxTestScale;
         Erms_train(1,dum) = RMSE_train; Erms_train(2,dum) = i*k;  % store errors and learning steps
         Erms_test(1,dum) = RMSE_test; Erms_test(2,dum) = i*k; % store errors and learning steps
         
@@ -267,7 +283,7 @@ function MSSE = computeErrorMeasure(desiredOutput, actualOutput)
 % finding root mean square error per pattern
 % Input are matrices 768 x 64
 
-MSSE = norm((desiredOutput - actualOutput),'fro').^2;
+MSSE = norm((desiredOutput - actualOutput),'fro').^2 / numel(desiredOutput);
 % RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ size(desiredOutput,1));
 
 end
