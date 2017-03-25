@@ -8,14 +8,14 @@ batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
 eval_points = 100; % number of points in the learning history or error vs time graph
 
 numNodes = [64, 16, 64];  % set the number of nodes in each layers in the neural network including input layer - don't include bias nodes
-weightMatrices = createWeightMatrices(numNodes,[-.1,.1]);  % create the weight matrices for each hidden layer and output layer; [] = range of the weights
+weightMatrices = createWeightMatrices(numNodes,[0,.2]);  % create the weight matrices for each hidden layer and output layer; [] = range of the weights
 
-learningRate = 3e-2;
+learningRate = 3e-3;
 alpha = 0.7; % forgetting rate for momentum term >> Make it 0 for no momentum correction 
 
 tanhSlope = 1;  % set the slope of the hyperbolic tangent function
 
-maxLearnSteps = 5e4;  % number of times each batch is processed ; can terminate before if converged
+maxLearnSteps = 1e4;  % number of times each batch is processed ; can terminate before if converged
 errorTolerance = 0.001;  % scaled error tolerance (for inputs between [.1 - 1])
 
 %% Input and Output samples for TRAINING the BP network
@@ -63,42 +63,31 @@ else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
 
-disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput))])
+disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput,maxTrainScale))])
 
 %% reconstructing the image from the actual output from recall step
 
 recalcTrain = reconstructImage(actualTrainOutput);
 recalcTest = reconstructImage(actualTestOutput);
 
-ocelotBackCalc = reconstructImage(trainInput) * maxTrainScale;
-%% plot for Training accuracy
-figure;
+ocelotBackCalc = reconstructImage(trainInput);
+fruitstillBackCalc = reconstructImage(testInput);
 
-subplot(2,2,1); imagesc(ocelotBackCalc); colormap('gray'); title('Original Image')
-s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image')
-s3 = subplot(2,2,3); imagesc(ocelot - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
-s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
-
-%% plot for Training accuracy - unscaled plot
+%% plot for Training accuracy 
 figure;
 
 subplot(2,2,1); imagesc(ocelotBackCalc); colormap('gray'); title('Original Image'); colorbar
 s2 = subplot(2,2,2); imagesc(recalcTrain); colormap('gray'); title('Reconstructed Image'); colorbar
-s3 = subplot(2,2,3); imagesc(ocelot - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
+s3 = subplot(2,2,3); imagesc(ocelotBackCalc - recalcTrain); colormap('gray'); title('Residual (difference) Image'); colorbar
 % s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
 
-%% % plot for Testing accuracy
+%% plot for Testing accuracy 
 % figure;
 % 
-% plot(sort(testInput,'descend'),sort(actualTestOutput),'--');
-% hold on;
-% plot(testInput,testOutput);
-% 
-% grid on
-% xlabel('x')
-% ylabel('f(x) = 1/x')
-% title('Comparison of actual testing accuracy wrt desired output')
-% legend('Learnt Function','Actual Function')
+% subplot(2,2,1); imagesc(fruitstillBackCalc); colormap('gray'); title('Original Image'); colorbar
+% s2 = subplot(2,2,2); imagesc(recalcTest); colormap('gray'); title('Reconstructed Image'); colorbar
+% s3 = subplot(2,2,3); imagesc(fruitstillBackCalc - recalcTest); colormap('gray'); title('Residual (difference) Image'); colorbar
+% % s3p = get(s3,'position');s2p = get(s2,'position'); s3p(3:4) = s2p(3:4); set(s3,'position',s3p); % setting image 3 same size as other images
 
 %% % plot for Training/Testing accuracy
 % figure;
@@ -148,8 +137,8 @@ outDim = size(trainOutput);
 dum = 1; % dummy index for storing RMS errors at frequent intervals while training
 frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
 frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
-Erms_train(1,dum) = computeErrorMeasure(trainOutput,frozenTrainOutput)* maxTrainScale ; Erms_train(2,dum) = 0;  % store errors and learning steps
-Erms_test(1,dum) = computeErrorMeasure(testOutput,frozenTestOutput) * maxTestScale; Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
+Erms_train(1,dum) = computeErrorMeasure(trainOutput,frozenTrainOutput,maxTrainScale); Erms_train(2,dum) = 0;  % store errors and learning steps
+Erms_test(1,dum) = computeErrorMeasure(testOutput,frozenTestOutput,maxTestScale); Erms_test(2,dum) = 0; dum = dum + 1; % store errors and learning steps
 
 if batchSize > length(trainInput)
     disp('Batch size must be lower than or equal to the total number of available patterns. Please reset and retry!')
@@ -215,8 +204,8 @@ for i = 1:maxLearnSteps % big loop
         dum = i/eval_interval + 1;
         frozenTrainOutput = BPrecall(trainInput, tanhSlope, numNodes, weightMatrices, outDim);
         frozenTestOutput = BPrecall(testInput, tanhSlope, numNodes, weightMatrices, outDim);
-        RMSE_train = computeErrorMeasure(trainOutput,frozenTrainOutput)* maxTrainScale;
-        RMSE_test = computeErrorMeasure(testOutput,frozenTestOutput)* maxTestScale;
+        RMSE_train = computeErrorMeasure(trainOutput,frozenTrainOutput,maxTrainScale); % mean sq error => rescaling is squared
+        RMSE_test = computeErrorMeasure(testOutput,frozenTestOutput,maxTestScale);
         Erms_train(1,dum) = RMSE_train; Erms_train(2,dum) = i*k;  % store errors and learning steps
         Erms_test(1,dum) = RMSE_test; Erms_test(2,dum) = i*k; % store errors and learning steps
         
@@ -279,11 +268,11 @@ end
 end
 
 
-function MSSE = computeErrorMeasure(desiredOutput, actualOutput)
+function MSSE = computeErrorMeasure(desiredOutput, actualOutput, scale)
 % finding root mean square error per pattern
 % Input are matrices 768 x 64
 
-MSSE = norm((desiredOutput - actualOutput),'fro').^2 / numel(desiredOutput);
+MSSE = norm(((desiredOutput - actualOutput) * scale),'fro').^2 / numel(desiredOutput);
 % RMSE = sqrt(sum((desiredOutput - actualOutput) .^ 2) ./ size(desiredOutput,1));
 
 end
