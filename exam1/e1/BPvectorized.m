@@ -1,7 +1,7 @@
 % “Exam01, Problem 1 (Compression)”
 function BPvectorized
 % Prashant Kalvapalle, Ragib Mostofa
-% COMP 502, Spring 2017, Homework Assignment IV Part II, Problem II
+% COMP 502, Spring 2017,Exam 01 Problem I
 % Vectorized BP
 
 batchSize = 1;  % set the size of the batch, i.e. number of patterns per batch
@@ -21,7 +21,7 @@ errorTolerance = 0.001;  % scaled error tolerance (for inputs between [.1 - 1])
 %% Input and Output samples for TRAINING the BP network
 load ocelot;
 
-maxTrainScale = max(max(ocelot)); % not relevant in this code - since image is being scaled 
+maxTrainScale = max(max(ocelot));  
 % ocelotSc = ocelot ./ max(max(ocelot));  % scaling the input image pixels to lie between [0,1]
 
 trainInput = loadVectors(ocelot); % each row is a pattern; size 768 x 64
@@ -42,9 +42,9 @@ testOutput = testInput;
 scaledTestInput = testInput/maxTestScale;
 scaledTestOutput = scaledTestInput; % output is same as input
 
+%% calling the BPtraining algorithm
 outDim = size(trainOutput);
 
-%% calling the BPtraining algorithm
 [weightMatrices,otherVariables] = BPLearn(scaledTrainInput, scaledTrainOutput, scaledTestInput, scaledTestOutput, numNodes, weightMatrices, learningRate, tanhSlope, batchSize, maxLearnSteps, errorTolerance, alpha, eval_points,maxTrainScale,maxTestScale);
 
 actualTrainOutput = BPrecall(scaledTrainInput, tanhSlope, numNodes, weightMatrices, outDim) .* maxTrainScale; % re-scaled
@@ -54,8 +54,8 @@ actualTestOutput = BPrecall(scaledTestInput, tanhSlope, numNodes, weightMatrices
 % disp(sort(actualTrainOutput,'descend'))
 
 total_steps = otherVariables{1};
-Erms_train = otherVariables{2}; Erms_train(1,:) = maxTrainScale.*Erms_train(1,:);
-Erms_test = otherVariables{3}; Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
+Erms_train = otherVariables{2}; %Erms_train(1,:) = maxTrainScale.*Erms_train(1,:); % scaling already in the error function
+Erms_test = otherVariables{3}; %Erms_test(1,:) = maxTestScale.*Erms_test(1,:);
 
 if total_steps == maxLearnSteps * batchSize
     disp(['Max iterations reached: MaxIters = ',num2str(total_steps)])
@@ -63,7 +63,7 @@ else
     disp(['LEARNING DONE: Steps taken = ',num2str(total_steps)])
 end
 
-disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput,maxTrainScale))])
+disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOutput,1))]) % its already in data scale
 
 %% reconstructing the image from the actual output from recall step
 
