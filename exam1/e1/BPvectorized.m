@@ -67,10 +67,10 @@ disp(['Avg MSSE error = ',num2str(computeErrorMeasure(trainOutput,actualTrainOut
 
 %% reconstructing the image from the actual output from recall step
 
-recalcTrain = reconstructImage(actualTrainOutput);
+recalcTrain = reconstructImage(actualTrainOutput); % this is in original data scale 
 recalcTest = reconstructImage(actualTestOutput);
 
-ocelotBackCalc = reconstructImage(trainInput);
+ocelotBackCalc = reconstructImage(trainInput); % this is in original data scale
 fruitstillBackCalc = reconstructImage(testInput);
 
 %% plot for Training accuracy 
@@ -172,7 +172,7 @@ for i = 1:maxLearnSteps % big loop
         
         % forward propagation
         layerOutputs{1} = pattern;
-        layerOutputs{1}(end+1) = 1;  % fixing bias = 1
+        layerOutputs{1}(end+1,1) = 1;  % fixing bias = 1
         
         for l = 1:length(numNodes)-2
             layerOutputs{l+1} = hyperbolicTangentFunction(tanhSlope, weightMatrices{l} * layerOutputs{l});
